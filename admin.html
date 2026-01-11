@@ -1,0 +1,73 @@
+﻿<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin | Equipamento</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    body { padding-top: 90px; }
+    .admin-container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .admin-header { display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; }
+    .admin-card { background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); padding:20px; margin-bottom:20px; }
+    .admin-card h3 { margin-bottom: 10px; }
+    .field { margin-bottom: 12px; }
+    .field label { display:block; font-size:0.85rem; opacity:0.8; margin-bottom:6px; }
+    .field input[type="text"], .field textarea { width:100%; padding:10px; background:#111; color:#fff; border:1px solid rgba(255,255,255,0.15); }
+    .images-list .image-row { display:flex; gap:10px; margin-bottom:8px; align-items:center; }
+    .images-list .image-row input { flex:1; }
+    .images-list .image-row button { padding: 0 10px; }
+    .actions { display:flex; gap:10px; flex-wrap: wrap; }
+    .notice { font-size: 0.9rem; opacity: 0.8; margin: 10px 0 20px; }
+    .btn-sm { padding:10px 16px; font-size:0.8rem; letter-spacing:1px; }
+    .tabs { display:flex; gap:10px; margin-bottom:15px; }
+    .tab-btn { padding:10px 14px; background:#111; border:1px solid rgba(255,255,255,0.15); color:#fff; cursor:pointer; letter-spacing:1px; }
+    .tab-btn.active { background:#fff; color:#000; }
+    [data-tab-section] { display:none; }
+    [data-tab-section].active { display:block; }
+  </style>
+  <script defer src="assets/js/admin.js"></script>
+  <nav>
+    <img src="./images/Logo.png" alt="Trap Houze Records Logo" class="nav-logo" />
+    <ul>
+      <li><a href="index.html">Voltar ao Site</a></li>
+      <li><a href="#">Admin</a></li>
+    </ul>
+  </nav>
+</head>
+<body>
+  <div class="admin-container">
+    <!-- Menu Admin -->
+    <div class="admin-header">
+      <h1 class="section-title" style="margin:0;font-size:1.6rem;letter-spacing:4px;">Admin &raquo; Menu</h1>
+      <div class="actions">
+        <button class="btn btn-sm" id="addMenuItem">+ Adicionar item</button>
+        <label class="btn btn-sm" for="importMenu">Importar Menu</label>
+        <input id="importMenu" type="file" accept="application/json" style="display:none" />
+        <button class="btn btn-sm" id="downloadMenu">Exportar Menu</button>
+        <button class="btn btn-sm" id="saveMenuFs">Gravar Menu</button>
+      </div>
+    </div>
+    <div id="menuItems"></div>
+
+    <hr style="border-color:rgba(255,255,255,0.1);margin:30px 0;"/>
+
+    <!-- Equipment Admin -->
+    <div class="admin-header">
+      <h1 class="section-title" style="margin:0;font-size:1.6rem;letter-spacing:4px;">Admin &raquo; Equipamento</h1>
+      <div class="actions">
+        <button class="btn btn-sm" id="addItem">+ Adicionar item</button>
+        <label class="btn btn-sm" for="importJson">Importar JSON</label>
+        <input id="importJson" type="file" accept="application/json" style="display:none" />
+        <button class="btn btn-sm" id="downloadJson">Exportar JSON</button>
+        <button class="btn btn-sm" id="saveFs">Gravar ficheiro</button>
+      </div>
+    </div>
+
+    <p class="notice">Para alterar as imagens, edita os URLs nas listas de cada item. Carrega os novos ficheiros para <code>imagens/equipamento/</code> e referencia-os aqui (ex.: <code>./imagens/equipamento/novo1.jpg</code>). Depois exporta e substitui <code>data/equipment.json</code>.</p>
+
+    <div id="items"></div>
+  </div>
+</body>
+</html>
+

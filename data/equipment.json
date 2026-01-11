@@ -1,0 +1,66 @@
+{
+  "midi": {
+    "title": "Teclados MIDI",
+    "images": [
+      "./imagens/equipamento/midi1.jpg",
+      "./imagens/equipamento/midi2.jpg"
+    ],
+    "description": "Controladores MIDI profissionais de última geração, incluindo teclados de 49, 61 e 88 teclas. Equipados com pads sensíveis à velocidade, faders e knobs atribuíveis."
+  },
+  "microfones": {
+    "title": "Microfones Profissionais",
+    "images": [
+      "./imagens/equipamento/mic1.jpg",
+      "./imagens/equipamento/mic2.jpg"
+    ],
+    "description": "Coleção premium de microfones condensadores e dinâmicos. Neumann U87, Shure SM7B, AKG C414 e mais."
+  },
+  "monitores": {
+    "title": "Monitores de Estúdio",
+    "images": [
+      "./imagens/equipamento/monitor1.jpg",
+      "./imagens/equipamento/monitor2.jpg"
+    ],
+    "description": "Monitores de referência KRK Rokit e Yamaha HS para uma escuta precisa e mixagens profissionais."
+  },
+  "daw": {
+    "title": "DAW Profissional",
+    "images": [
+      "./imagens/equipamento/daw1.jpg",
+      "./imagens/equipamento/daw2.jpg"
+    ],
+    "description": "Workstations equipadas com FL Studio, Ableton Live e Pro Tools, com plugins premium e workflow otimizado."
+  },
+  "interface": {
+    "title": "Interfaces de Áudio",
+    "images": [
+      "./imagens/equipamento/interface1.jpg",
+      "./imagens/equipamento/interface2.jpg"
+    ],
+    "description": "Interfaces Focusrite, Universal Audio e outras, com conversores de alta qualidade e pré‑amplificadores profissionais."
+  },
+  "mesa": {
+    "title": "Mesa de Mistura",
+    "images": [
+      "./imagens/equipamento/mesa1.jpg",
+      "./imagens/equipamento/mesa2.jpg"
+    ],
+    "description": "Mesa com múltiplos canais, EQ, compressão e routing flexível para gravações e sessões complexas."
+  },
+  "preamp": {
+    "title": "Pré‑Amplificadores",
+    "images": [
+      "./imagens/equipamento/preamp1.jpg",
+      "./imagens/equipamento/preamp2.jpg"
+    ],
+    "description": "Pré‑amplificadores estilo Neve/API para adicionar cor, calor e presença às vozes e instrumentos."
+  },
+  "camera": {
+    "title": "Equipamento Fotográfico",
+    "images": [
+      "./imagens/equipamento/camera1.jpg",
+      "./imagens/equipamento/camera2.jpg"
+    ],
+    "description": "Câmaras Canon/Sony, iluminação e fundos para sessões fotográficas profissionais no estúdio."
+  }
+}

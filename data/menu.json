@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "label": "Home",
+      "href": "#home",
+      "id": "home",
+      "visible": true
+    },
+    {
+      "label": "Serviços",
+      "href": "#services",
+      "id": "services",
+      "visible": true
+    },
+    {
+      "label": "Equipamento",
+      "href": "#equipment",
+      "id": "equipment",
+      "visible": false
+    },
+    {
+      "label": "Quem Somos",
+      "href": "#about",
+      "id": "about",
+      "visible": false
+    },
+    {
+      "label": "Artistas",
+      "href": "#artists",
+      "id": "artists",
+      "visible": false
+    },
+    {
+      "label": "Avaliações",
+      "href": "#reviews",
+      "id": "reviews",
+      "visible": false
+    }
+  ]
+}

@@ -10,10 +10,13 @@
     <link rel="shortcut icon" type="image/x-icon" href="./imagens/favicon.ico">
     <link rel="apple-touch-icon" href="./imagens/apple-touch-icon.png">
    
-    <link rel="stylesheet" href="assets/css/style.css">
-    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-<!--
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #000;
@@ -145,7 +148,6 @@
             gap: 40px;
             max-width: 1400px;
             margin: 0 auto;
-            align-items: stretch;
         }
 
         .service-card {
@@ -154,11 +156,6 @@
             padding: 50px 40px;
             text-align: center;
             transition: all 0.4s;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            gap: 16px;
-            min-height: 380px; /* Para alinhar botões */
         }
 
         .service-card:hover {
@@ -167,7 +164,12 @@
             border-color: rgba(255, 255, 255, 0.2);
         }
 
-        
+        .service-card:last-child {
+            grid-column: 1 / -1;
+            max-width: 400px;
+            margin: 0 auto;
+            width: 100%;
+        }
 
         .service-icon {
             font-size: 3rem;
@@ -201,7 +203,6 @@
             font-size: 0.85rem;
             letter-spacing: 3px;
             transition: all 0.3s;
-            margin-top: auto;
         }
 
         .btn:hover {
@@ -687,9 +688,7 @@
                 margin-bottom: 40px;
             }
 
-            .service-grid,
-            .equipment-grid,
-            .review-container {
+            .service-grid, .equipment-grid, .review-container {
                 grid-template-columns: 1fr;
             }
 
@@ -756,7 +755,6 @@
             }
         }
     </style>
--->
 </head>
 <body>
     <!-- Popup de Agendamento TidyCal -->
@@ -776,18 +774,93 @@
       </div>
     </div>
     
-    
+    <style>
+      /* ===== POPUP BOOKING ===== */
+      .popup-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        justify-content: center;
+        align-items: center;
+        z-index: 3000;
+        animation: fadeIn 0.3s ease;
+        padding: 20px;
+      }
+  
+      .popup {
+        background: #111;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 900px;
+        max-height: 95vh;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+        animation: slideUp 0.3s ease;
+      }
+  
+      .popup-header {
+        padding: 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+      }
+  
+      .popup-header h2 {
+        color: white;
+        font-size: 1.3rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        font-weight: 500;
+      }
+  
+      .popup-body {
+        overflow-y: auto;
+        padding: 20px;
+        flex: 1;
+      }
+  
+      .close-btn {
+        position: absolute;
+        top: 10px;
+        right: 18px;
+        font-size: 28px;
+        color: #aaa;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+  
+      .close-btn:hover {
+        color: #fff;
+      }
+  
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+  
+      @keyframes slideUp {
+        from { transform: translateY(40px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+    </style>
+
 
     <!-- Navegação -->
     <nav>
         <img src="./images/Logo.png" alt="Trap Houze Records Logo" class="nav-logo">
         <ul>
-            <li data-section-link="home"><a href="#home">Home</a></li>
-            <li data-section-link="services"><a href="#services">Serviços</a></li>
-            <li data-section-link="equipment"><a href="#equipment">Equipamento</a></li>
-            <li data-section-link="about"><a href="#about">Quem Somos</a></li>
-            <li data-section-link="artists"><a href="#artists">Artistas</a></li>
-            <li data-section-link="reviews"><a href="#reviews">Avaliações</a></li>
+            <li><a href="#home">Home</a></li>
+            <li><a href="#services">Serviços</a></li>
+            <li><a href="#equipment">Equipamento</a></li>
+            <li><a href="#about">Quem Somos</a></li>
+            <li><a href="#artists">Artistas</a></li>
+            <li><a href="#reviews">Avaliações</a></li>
         </ul>
     </nav>
 
@@ -824,49 +897,39 @@
         <h2 class="section-title">Serviços</h2>
         <div class="service-grid">
             <div class="service-card">
-                <div>
-                    <div class="service-icon">📅</div>
-                    <h3>Agendamento</h3>
-                    <p>Reserve o seu horário no nosso estúdio profissional equipado com tecnologia de ponta.</p>
-                </div>
+                <div class="service-icon">📅</div>
+                <h3>Agendamento</h3>
+                <p>Reserve o seu horário no nosso estúdio profissional equipado com tecnologia de ponta.</p>
                 <button class="btn" onclick="bookService('Agendamento')">Agendar</button>
             </div>
            
-            <!-- Exemplos comentados, podes ativar quando quiseres
+            <!--
             <div class="service-card">
-                <div>
-                    <div class="service-icon">🎤</div>
-                    <h3>Sessão de Estúdio</h3>
-                    <p>Grave as suas tracks num ambiente profissional com engenheiros de som experientes.</p>
-                </div>
+                <div class="service-icon">🎤</div>
+                <h3>Sessão de Estúdio</h3>
+                <p>Grave as suas tracks num ambiente profissional com engenheiros de som experientes.</p>
                 <button class="btn" onclick="bookService('Sessão de Estúdio')">Reservar</button>
             </div>
            
             <div class="service-card">
-                <div>
-                    <div class="service-icon">📸</div>
-                    <h3>Sessão Fotográfica</h3>
-                    <p>Capte a essência do seu estilo com sessões fotográficas profissionais.</p>
-                </div>
+                <div class="service-icon">📸</div>
+                <h3>Sessão Fotográfica</h3>
+                <p>Capte a essência do seu estilo com sessões fotográficas profissionais.</p>
                 <button class="btn" onclick="bookService('Sessão Fotográfica')">Reservar</button>
             </div>
            
             <div class="service-card">
-                <div>
-                    <div class="service-icon">🎧</div>
-                    <h3>Captação Guiada</h3>
-                    <p>Sessão completa com orientação profissional para extrair o melhor da sua performance.</p>
-                </div>
+                <div class="service-icon">🎧</div>
+                <h3>Captação Guiada</h3>
+                <p>Sessão completa com orientação profissional para extrair o melhor da sua performance.</p>
                 <button class="btn" onclick="bookService('Captação Guiada')">Agendar</button>
             </div>
             -->
            
             <div class="service-card">
-                <div>
-                    <div class="service-icon">🎛️</div>
-                    <h3>Mix & Master</h3>
-                    <p>Tratamento profissional das suas tracks para qualidade de rádio e streaming.</p>
-                </div>
+                <div class="service-icon">🎛️</div>
+                <h3>Mix & Master</h3>
+                <p>Tratamento profissional das suas tracks para qualidade de rádio e streaming.</p>
                 <button class="btn" onclick="bookServiceMixMaster()">Reservar</button>
             </div>
         </div>
@@ -875,7 +938,7 @@
     <!-- Equipamento -->
     <section id="equipment" class="equipment">
         <h2 class="section-title">Equipamento</h2>
-        <div class="equipment-grid" id="equipmentGrid">
+        <div class="equipment-grid">
             <div class="equipment-item" onclick="openModal('midi')">
                 <div class="equipment-icon">🎹</div>
                 <h4>Teclados MIDI</h4>
@@ -966,6 +1029,7 @@
             </div>
            
             <div class="about-image">
+                <!-- <img src="./imagens/studio.jpg" style="width:100%;height:100%;object-fit:cover;"> -->
                 Imagem do Estúdio
             </div>
         </div>
@@ -976,7 +1040,10 @@
         <h2 class="section-title">Artistas</h2>
         <div class="artists-grid">
             <div class="artist-item" onclick="openArtistModal('artist1')">
-                <div class="artist-item-image">FOTO</div>
+                <div class="artist-item-image">
+                    <!-- <img src="./imagens/artistas/artist1.jpg" style="width:100%;height:100%;object-fit:cover;"> -->
+                    FOTO
+                </div>
                 <div class="artist-item-name">
                     <h4>MC Flow</h4>
                     <p>Rapper</p>
@@ -1121,6 +1188,7 @@
         <div class="help-content">
             <p>Estamos aqui para ajudar! Entre em contacto:</p>
             <div class="help-contact">
+                <!-- <a href="tel:+351000000000">📞 +351 000 000 000</a> -->
                 <a href="mailto:info@traphouze.com">📧 info@traphouze.com</a>
                 <a href="https://instagram.com/traphouzerecords" target="_blank">📱 @traphouzerecords</a>
                 <a href="https://wa.me/351910734914" target="_blank">💬 WhatsApp</a>
@@ -1129,37 +1197,7 @@
         </div>
     </div>
 
-    <script src="assets/js/main.js" defer></script>
-    <!-- <script>
-        // ===== CONFIGURAÇÃO RÁPIDA DE VISIBILIDADE =====
-        // Altera para true/false para mostrar/esconder cada secção e respetivo item da navbar
-        const sectionsVisibility = {
-            home: true,
-            services: true,
-            equipment: true,
-            about: true,
-            artists: false,   // por agora escondido
-            reviews: false    // por agora escondido
-        };
-
-        window.addEventListener("DOMContentLoaded", () => {
-            // Controla secções
-            Object.entries(sectionsVisibility).forEach(([id, visible]) => {
-                const section = document.getElementById(id);
-                if (section) {
-                    section.style.display = visible ? "block" : "none";
-                }
-            });
-
-            // Controla itens da navbar
-            document.querySelectorAll("[data-section-link]").forEach(li => {
-                const target = li.getAttribute("data-section-link");
-                if (target in sectionsVisibility && !sectionsVisibility[target]) {
-                    li.style.display = "none";
-                }
-            });
-        });
-
+    <script>
         // ========== SLIDESHOW ==========
         let currentSlide = 0;
         const slides = document.querySelectorAll('.slide');
@@ -1172,21 +1210,23 @@
        
         setInterval(() => showSlide(currentSlide + 1), 5000);
 
+ 
         // ========== BOOKING ==========
         function bookService(service) {
           const popup = document.getElementById("bookingPopup");
           const title = document.getElementById("popupServiceTitle");
           title.textContent = `Agendar ${service}`;
           popup.style.display = "flex";
-          document.body.style.overflow = "hidden";
+          document.body.style.overflow = "hidden"; // bloqueia scroll do fundo
         }
 
         function bookServiceMixMaster() {
-            const phone = "351910734914";
-            const message = "Olá Trap Houze! Quero marcar Mix & Master.";
+            const phone = "351910734914"; // número da Trap Houze
+            const message = "Olá Trap Houze! Quero marcar uma sessão de estúdio."; 
             const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
             window.open(url, "_blank");
         }
+
 
         function closeBookingPopup() {
           const popup = document.getElementById("bookingPopup");
@@ -1194,9 +1234,11 @@
           document.body.style.overflow = "auto";
         }
 
+        // Fecha ao clicar fora do pop-up
         document.getElementById("bookingPopup").addEventListener("click", function(e) {
           if (e.target === this) closeBookingPopup();
         });
+
 
         // ========== EQUIPAMENTO MODAL ==========
         const equipmentData = {
@@ -1208,44 +1250,43 @@
             microfones: {
                 title: 'Microfones Profissionais',
                 images: ['./imagens/equipamento/mic1.jpg', './imagens/equipamento/mic2.jpg'],
-                description: 'Coleção premium de microfones condensadores e dinâmicos. Neumann U87, Shure SM7B, AKG C414 e mais.'
+                description: 'Coleção premium de microfones condensadores e dinâmicos. Neumann U87 para vocais de estúdio, Shure SM7B para gravações versáteis, AKG C414 para instrumentos.'
             },
             monitores: {
                 title: 'Monitores de Estúdio',
                 images: ['./imagens/equipamento/monitor1.jpg', './imagens/equipamento/monitor2.jpg'],
-                description: 'Monitores de referência KRK Rokit e Yamaha HS para uma escuta precisa e mixagens profissionais.'
+                description: 'Monitores de estúdio de referência KRK Rokit e Yamaha HS series. Resposta de frequência flat e precisa para mixagens profissionais.'
             },
             daw: {
                 title: 'DAW Profissional',
                 images: ['./imagens/equipamento/daw1.jpg', './imagens/equipamento/daw2.jpg'],
-                description: 'Workstations equipadas com FL Studio, Ableton Live e Pro Tools, com plugins premium e workflow otimizado.'
+                description: 'Estações de trabalho equipadas com FL Studio, Ableton Live e Pro Tools. Bibliotecas extensas de plugins premium.'
             },
             interface: {
                 title: 'Interfaces de Áudio',
                 images: ['./imagens/equipamento/interface1.jpg', './imagens/equipamento/interface2.jpg'],
-                description: 'Interfaces Focusrite, Universal Audio e outras, com conversores de alta qualidade e pré-amplificadores profissionais.'
+                description: 'Interfaces de áudio Focusrite Scarlett e Universal Audio Apollo. Conversores AD/DA de alta qualidade, pré-amplificadores limpos.'
             },
             mesa: {
                 title: 'Mesa de Mistura',
                 images: ['./imagens/equipamento/mesa1.jpg', './imagens/equipamento/mesa2.jpg'],
-                description: 'Mesa com múltiplos canais, EQ, compressão e routing flexível para gravações e sessões complexas.'
+                description: 'Mesa de mistura profissional com múltiplos canais, EQ por faixa, compressão e efeitos integrados.'
             },
             preamp: {
                 title: 'Pré-Amplificadores',
                 images: ['./imagens/equipamento/preamp1.jpg', './imagens/equipamento/preamp2.jpg'],
-                description: 'Pré-amplificadores estilo Neve/API para adicionar cor, calor e presença às vozes e instrumentos.'
+                description: 'Pré-amplificadores boutique Neve e API para coloração analógica premium. Adicione calor e carácter às suas gravações.'
             },
             camera: {
                 title: 'Equipamento Fotográfico',
                 images: ['./imagens/equipamento/camera1.jpg', './imagens/equipamento/camera2.jpg'],
-                description: 'Câmaras Canon/Sony, iluminação e fundos para sessões fotográficas profissionais no estúdio.'
+                description: 'Câmaras Canon e Sony full-frame com lentes profissionais, sistema de iluminação LED ajustável, fundos variados.'
             }
         };
 
         function openModal(type) {
             const modal = document.getElementById('equipmentModal');
             const data = equipmentData[type];
-            if (!data) return;
            
             document.getElementById('modalTitle').textContent = data.title;
             document.getElementById('modalDescription').textContent = data.description;
@@ -1278,51 +1319,51 @@
             artist1: {
                 name: 'MC Flow',
                 genre: 'Trap | Hip-Hop',
-                trajectory: '<p>Começou em 2020 e rapidamente se destacou na cena trap nacional, somando centenas de milhares de streams.</p>',
-                testimonial: '<p>A Trap Houze Records foi fundamental para elevar a qualidade do meu som e profissionalizar o meu processo.</p>'
+                trajectory: '<p>Começou a sua carreira em 2020 e rapidamente se destacou na cena trap nacional. Com 3 EPs lançados e mais de 500k streams nas plataformas digitais.</p><p>As suas letras autênticas e flow único conquistaram milhares de fãs em todo o país.</p>',
+                testimonial: '<p>A Trap Houze Records foi fundamental no meu crescimento. O profissionalismo e a qualidade do som que consegui aqui levaram a minha música a outro patamar.</p>'
             },
             artist2: {
                 name: 'Lil Trap',
                 genre: 'Trap | Drill',
-                trajectory: '<p>Artista com várias colaborações de peso e projetos gravados em estúdios profissionais.</p>',
-                testimonial: '<p>O ambiente e o som da Trap Houze dão vontade de criar hits atrás de hits.</p>'
+                trajectory: '<p>Veterano da cena com mais de 5 anos de carreira. Já colaborou com os maiores nomes do trap português e acumula milhões de visualizações.</p><p>Gravou os seus últimos 2 álbuns completos na Trap Houze Records.</p>',
+                testimonial: '<p>Já passei por vários estúdios, mas a Trap Houze tem algo especial. O ambiente é perfeito para criar, o equipamento é top e a equipa entende mesmo a nossa visão.</p>'
             },
             artist3: {
                 name: 'DJ Beats',
                 genre: 'Producer | Beatmaker',
-                trajectory: '<p>Responsável por produções para diversos artistas, sempre a inovar no som.</p>',
-                testimonial: '<p>A Trap Houze dá-me as condições perfeitas para produzir e finalizar instrumentais de alto nível.</p>'
+                trajectory: '<p>Um dos produtores mais requisitados da nova geração. As suas beats já foram usadas por dezenas de artistas nacionais e internacionais.</p><p>Produz regularmente na Trap Houze Records desde 2021.</p>',
+                testimonial: '<p>Como produtor, preciso de um setup impecável e a Trap Houze oferece exatamente isso. A qualidade do som que consigo aqui é incomparável.</p>'
             },
             artist4: {
                 name: 'Rapper King',
                 genre: 'Rap | Hip-Hop',
-                trajectory: '<p>Nova escola com barras fortes e presença em vários palcos nacionais.</p>',
-                testimonial: '<p>Gravar aqui fez a diferença na forma como o meu trabalho é recebido.</p>'
+                trajectory: '<p>Artista emergente com um estilo único que mistura rap consciente com trap moderno. Lançou o seu primeiro álbum este ano, totalmente gravado na Trap Houze Records.</p><p>É considerado um dos talentos mais promissores da nova geração.</p>',
+                testimonial: '<p>Sou um artista novo e a equipa da Trap Houze ajudou-me imenso no processo. Desde a gravação até ao mix final, tive todo o apoio necessário.</p>'
             },
             artist5: {
                 name: 'Producer Pro',
                 genre: 'Producer | Mix Engineer',
-                trajectory: '<p>Anos de experiência em mix e master de projetos de referência.</p>',
-                testimonial: '<p>Setup técnico da Trap Houze está ao nível dos grandes estúdios.</p>'
+                trajectory: '<p>Engenheiro de som profissional com mais de 10 anos de experiência na indústria musical. Trabalha com artistas de topo.</p><p>Já trabalhou em centenas de projetos, desde álbuns completos a singles de sucesso.</p>',
+                testimonial: '<p>A Trap Houze tem tudo o que um profissional precisa. Desde o tratamento acústico ao equipamento de ponta, cada detalhe foi pensado para entregar a melhor qualidade.</p>'
             },
             artist6: {
                 name: 'Artista X',
                 genre: 'Trap Soul | R&B',
-                trajectory: '<p>Voz melódica com fusão de trap e R&B, com registos em estúdio profissional.</p>',
-                testimonial: '<p>A vibe do espaço ajuda-me a entrar mesmo no mood certo para gravar.</p>'
+                trajectory: '<p>Voz única que mistura trap com influências de R&B. Com apenas 2 anos de carreira já conquistou milhares de fãs.</p><p>Todas as suas músicas foram gravadas na Trap Houze Records.</p>',
+                testimonial: '<p>A atmosfera criativa da Trap Houze é incrível. Sinto-me à vontade para experimentar e explorar novos sons. A equipa está sempre disponível para ajudar.</p>'
             }
         };
 
         function openArtistModal(id) {
+            const modal = document.getElementById('artistModal');
             const data = artistsData[id];
-            if (!data) return;
-
+           
             document.getElementById('artistName').textContent = data.name;
             document.getElementById('artistGenre').textContent = data.genre;
             document.getElementById('artistTrajectory').innerHTML = data.trajectory;
             document.getElementById('artistTestimonial').innerHTML = data.testimonial;
-
-            document.getElementById('artistModal').classList.add('active');
+           
+            modal.classList.add('active');
             document.body.style.overflow = 'hidden';
         }
 
@@ -1358,6 +1399,6 @@
                 }
             });
         });
-    </script> -->
+    </script>
 </body>
 </html>
