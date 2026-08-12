@@ -1,378 +1,70 @@
-﻿async function loadData() {
-  const res = await fetch('data/equipment.json');
-  return await res.json();
+let draft;
+let activeTab = 'site';
+const apiBase = (window.CMS_API_URL || '').replace(/\/$/, '');
+const tabs = [['site', 'Identidade'], ['menu', 'Menu'], ['hero', 'Destaques'], ['services', 'Serviços'], ['equipment', 'Equipamento'], ['about', 'Quem somos'], ['artists', 'Artistas'], ['reviews', 'Avaliações']];
+const $ = selector => document.querySelector(selector);
+const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
+const field = (label, path, value, type = 'text') => `<label class="admin-field"><span>${label}</span>${type === 'textarea' ? `<textarea data-bind="${path}" rows="4">${escapeHtml(value || '')}</textarea>` : `<input type="${type}" data-bind="${path}" value="${escapeHtml(value || '')}">`}</label>`;
+const checkbox = (label, path, value) => `<label class="admin-check"><input type="checkbox" data-bind="${path}" ${value ? 'checked' : ''}><span>${label}</span></label>`;
+const addButton = (collection, label) => `<button class="btn btn-sm" data-add="${collection}">+ ${label}</button>`;
+
+function getPath(path) { return path.split('.').reduce((object, key) => object?.[key], draft); }
+function setPath(path, value) { const keys = path.split('.'); const last = keys.pop(); const target = keys.reduce((object, key) => object[key], draft); target[last] = value; }
+function card(title, body, remove = '') { return `<article class="admin-card"><div class="admin-card-heading"><h2>${escapeHtml(title)}</h2>${remove}</div>${body}</article>`; }
+function listCards(collection, renderer, label) { return `<div class="admin-list">${draft[collection].map(renderer).join('')}</div>${addButton(collection, label)}`; }
+
+function renderTab() {
+  $('#adminTabs').innerHTML = tabs.map(([id, label]) => `<button class="admin-tab ${id === activeTab ? 'active' : ''}" data-tab="${id}">${label}</button>`).join('');
+  const section = {
+    site: renderSite,
+    menu: renderMenu,
+    hero: renderHero,
+    services: renderServices,
+    equipment: renderEquipment,
+    about: renderAbout,
+    artists: renderArtists,
+    reviews: renderReviews
+  }[activeTab];
+  $('#adminContent').innerHTML = section();
 }
 
-async function loadMenuData() {
-  const res = await fetch('data/menu.json');
-  return await res.json();
+function renderSite() { const site = draft.site; return `<section class="admin-grid">${card('Dados gerais', [field('Nome', 'site.name', site.name), field('Subtítulo', 'site.tagline', site.tagline), field('Localização', 'site.location', site.location), field('E-mail', 'site.email', site.email), field('URL Instagram', 'site.instagram', site.instagram), field('Nome no Instagram', 'site.instagramHandle', site.instagramHandle), field('WhatsApp (só algarismos)', 'site.whatsapp', site.whatsapp), field('URL de agendamento', 'site.bookingUrl', site.bookingUrl), field('Horário', 'site.hours', site.hours)].join(''))}</section>`; }
+function renderMenu() { return `<section>${card('Navegação', '<p class="admin-hint">Desative uma secção para escondê-la do menu e do site.</p>' + draft.navigation.map((item, index) => `<div class="admin-row">${field('Nome', `navigation.${index}.label`, item.label)}${field('ID', `navigation.${index}.id`, item.id)}${checkbox('Visível', `navigation.${index}.visible`, item.visible)}</div>`).join(''))}</section>`; }
+function renderHero() { return `<section>${listCards('hero', (item, index) => card(`Destaque ${index + 1}`, `${field('Título', `hero.${index}.title`, item.title)}${field('Subtítulo', `hero.${index}.subtitle`, item.subtitle)}${field('Imagem (URL)', `hero.${index}.image`, item.image)}`, `<button class="admin-icon" data-remove="hero" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar destaque')}</section>`; }
+function renderServices() { return `<section>${listCards('services', (item, index) => card(item.title || `Serviço ${index + 1}`, `${field('Título', `services.${index}.title`, item.title)}${field('Ícone', `services.${index}.icon`, item.icon)}${field('Descrição', `services.${index}.description`, item.description, 'textarea')}<label class="admin-field"><span>Ação</span><select data-bind="services.${index}.action"><option value="booking" ${item.action === 'booking' ? 'selected' : ''}>Agenda</option><option value="whatsapp" ${item.action === 'whatsapp' ? 'selected' : ''}>WhatsApp</option></select></label>${checkbox('Disponível', `services.${index}.visible`, item.visible)}`, `<button class="admin-icon" data-remove="services" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar serviço')}</section>`; }
+function renderEquipment() { return `<section>${listCards('equipment', (item, index) => card(item.title || `Item ${index + 1}`, `${field('Identificador', `equipment.${index}.id`, item.id)}${field('Título', `equipment.${index}.title`, item.title)}${field('Descrição', `equipment.${index}.description`, item.description, 'textarea')}${field('Imagens (uma URL por linha)', `equipment.${index}.images`, item.images.join('\n'), 'textarea')}`, `<button class="admin-icon" data-remove="equipment" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar equipamento')}</section>`; }
+function renderAbout() { const about = draft.about; return `<section class="admin-grid">${card('Texto', `${field('Título', 'about.title', about.title)}${field('Parágrafos (um por linha)', 'about.paragraphs', about.paragraphs.join('\n'), 'textarea')}${field('Imagem (URL)', 'about.image', about.image)}`)}${card('Indicadores', about.stats.map((stat, index) => `<div class="admin-row">${field('Número', `about.stats.${index}.value`, stat.value)}${field('Descrição', `about.stats.${index}.label`, stat.label)}</div>`).join(''))}</section>`; }
+function renderArtists() { return `<section>${listCards('artists', (item, index) => card(item.name || `Artista ${index + 1}`, `${field('Nome', `artists.${index}.name`, item.name)}${field('Género / função', `artists.${index}.genre`, item.genre)}${field('Imagem (URL)', `artists.${index}.image`, item.image)}`, `<button class="admin-icon" data-remove="artists" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar artista')}</section>`; }
+function renderReviews() { return `<section>${listCards('reviews', (item, index) => card(item.name || `Avaliação ${index + 1}`, `${field('Nome', `reviews.${index}.name`, item.name)}${field('Texto', `reviews.${index}.text`, item.text, 'textarea')}`, `<button class="admin-icon" data-remove="reviews" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar avaliação')}</section>`; }
+
+function addItem(collection) { const models = { hero: { title: 'Novo destaque', subtitle: '', image: '' }, services: { title: 'Novo serviço', description: '', icon: '✦', action: 'booking', visible: true }, equipment: { id: 'novo-item', title: 'Novo equipamento', description: '', images: [] }, artists: { name: 'Novo artista', genre: '', image: '' }, reviews: { name: 'Nome', text: '' } }; draft[collection].push(models[collection]); renderTab(); }
+function removeItem(collection, index) { draft[collection].splice(index, 1); renderTab(); }
+function parseSpecial(path, value) { if (path.endsWith('.images')) return value.split('\n').map(item => item.trim()).filter(Boolean); if (path === 'about.paragraphs') return value.split('\n').map(item => item.trim()).filter(Boolean); return value; }
+function notice(message, kind = '') { const element = $('#notice'); element.textContent = message; element.className = `admin-notice ${kind}`; }
+
+async function loadContent() {
+  const url = apiBase ? `${apiBase}/content` : 'data/site.json';
+  const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) throw new Error('Não foi possível carregar o conteúdo.');
+  draft = await response.json(); renderTab();
 }
-
-function renderItems(container, data) {
-  container.innerHTML = '';
-  Object.entries(data).forEach(([key, item]) => {
-    const card = document.createElement('div');
-    card.className = 'admin-card';
-    card.setAttribute('data-oldkey', key);
-
-    card.innerHTML = `
-      <h3>${item.title || key} <small style="opacity:.6;font-size:.8rem;">(${key})</small></h3>
-      <div class="field">
-        <label>Título</label>
-        <input type="text" data-key="${key}" data-field="title" value="${(item.title||'').replace(/"/g,'&quot;')}">
-      </div>
-      <div class="field">
-        <label>Descrição</label>
-        <textarea rows="3" data-key="${key}" data-field="description">${item.description||''}</textarea>
-      </div>
-      <div class="field">
-        <label>Imagens (URLs relativas)</label>
-        <div class="images-list" data-key="${key}"></div>
-        <button class="btn btn-sm" data-action="add-image" data-key="${key}">+ Adicionar imagem</button>
-      </div>
-    `;
-
-    container.appendChild(card);
-
-    // Insert key field at the top
-    const keyField = document.createElement('div');
-    keyField.className = 'field';
-    keyField.innerHTML = `
-      <label>Identificador (key) — único, sem espaços</label>
-      <input type="text" data-key="${key}" data-field="key" value="${(key||'').replace(/\"/g,'&quot;')}">
-    `;
-    const firstField = card.querySelector('.field');
-    if (firstField) card.insertBefore(keyField, firstField); else card.appendChild(keyField);
-
-    const list = card.querySelector('.images-list');
-    (item.images || []).forEach((url, idx) => {
-      const row = document.createElement('div');
-      row.className = 'image-row';
-      row.setAttribute('data-index', String(idx));
-      row.innerHTML = `
-        <button class="btn btn-sm" title="Subir" data-action="img-up">&#9650;</button>
-        <button class="btn btn-sm" title="Descer" data-action="img-down">&#9660;</button>
-        <input type="text" value="${url.replace(/"/g,'&quot;')}">
-        <button class="btn btn-sm" data-action="remove-image">Remover</button>
-      `;
-      list.appendChild(row);
-    });
-    // Append remove item action
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-    actions.innerHTML = `<button class="btn btn-sm" data-action="remove-item" data-key="${key}">Remover item</button>`;
-    card.appendChild(actions);
-  });
+async function refreshSession() {
+  if (!apiBase) { notice('Pré-visualização local: configure o Worker para publicar.', 'muted'); return; }
+  try { const response = await fetch(`${apiBase}/auth/session`, { credentials: 'include' }); const session = await response.json(); if (session.authenticated) { $('#authStatus').textContent = `Ligado como ${session.login}`; $('#publishButton').hidden = false; } else $('#loginButton').hidden = false; } catch { notice('Não foi possível ligar ao serviço de publicação.', 'error'); }
 }
-
-function collectData(container, original) {
-  const data = {};
-  const cards = Array.from(container.querySelectorAll('.admin-card'));
-  for (const card of cards) {
-    const oldKey = card.getAttribute('data-oldkey');
-    const keyInput = card.querySelector('input[data-field="key"]');
-    let key = (keyInput?.value || '').trim();
-    if (!key) key = oldKey || 'item';
-    key = key.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
-    if (data[key]) {
-      alert(`Chave duplicada: ${key}. Ajusta para ser única.`);
-      return original;
-    }
-    const title = card.querySelector('input[data-field="title"]')?.value || '';
-    const description = card.querySelector('textarea[data-field="description"]')?.value || '';
-    const images = Array.from(card.querySelectorAll('.images-list input')).map(i => i.value).filter(Boolean);
-    data[key] = { title, description, images };
-  }
-  return data;
-}
-
-function download(filename, text) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
-async function saveWithFileSystemAccess(text) {
-  if (!('showSaveFilePicker' in window)) {
-    alert('O navegador não suporta gravação direta. Use Exportar JSON.');
-    return;
-  }
-  const handle = await window.showSaveFilePicker({
-    suggestedName: 'equipment.json',
-    types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
-  });
-  const writable = await handle.createWritable();
-  await writable.write(text);
-  await writable.close();
-  alert('Gravado! Substitua data/equipment.json no servidor.');
+async function publish() {
+  notice('A publicar…');
+  const response = await fetch(`${apiBase}/publish`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: draft }) });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'A publicação falhou.');
+  notice(`Publicado com sucesso. Commit ${result.commit.slice(0, 7)}. O GitHub Pages pode demorar um momento a atualizar.`, 'success');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  let original = await loadData();
-  let originalMenu = await loadMenuData();
-  const container = document.getElementById('items');
-  const menuContainer = document.getElementById('menuItems');
-  renderItems(container, original);
-  if (menuContainer) renderMenuItems(menuContainer, originalMenu);
-
-  // add/remove image rows
-  container.addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if (!btn) return;
-    const action = btn.getAttribute('data-action');
-    if (action === 'add-image') {
-      const key = btn.getAttribute('data-key');
-      const list = container.querySelector(`.images-list[data-key="${key}"]`);
-      const row = document.createElement('div');
-      row.className = 'image-row';
-      row.innerHTML = `<input type="text" placeholder="./imagens/equipamento/nome.jpg"><button class="btn btn-sm" data-action="remove-image">Remover</button>`;
-      list.appendChild(row);
-    } else if (action === 'remove-image') {
-      const row = btn.closest('.image-row');
-      row?.remove();
-    } else if (action === 'img-up' || action === 'img-down') {
-      const row = btn.closest('.image-row');
-      const list = row?.parentElement;
-      if (!row || !list) return;
-      if (action === 'img-up' && row.previousElementSibling) {
-        list.insertBefore(row, row.previousElementSibling);
-      }
-      if (action === 'img-down' && row.nextElementSibling) {
-        list.insertBefore(row.nextElementSibling, row);
-      }
-    } else if (action === 'remove-item') {
-      const card = btn.closest('.admin-card');
-      card?.remove();
-    }
-  });
-
-  // import JSON
-  document.getElementById('importJson').addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    try {
-      original = JSON.parse(text);
-      renderItems(container, original);
-    } catch (err) {
-      alert('JSON inválido');
-    }
-  });
-
-  // export JSON
-  document.getElementById('downloadJson').addEventListener('click', () => {
-    const data = collectData(container, original);
-    download('equipment.json', JSON.stringify(data, null, 2));
-  });
-
-  // save via FS Access API (persistente)
-  document.getElementById('saveFs').addEventListener('click', async () => {
-    const data = collectData(container, original);
-    await saveJSONWithPersist('equipment.json', JSON.stringify(data, null, 2));
-  });
-
-  // add new item
-  const addBtn = document.getElementById('addItem');
-  if (addBtn) {
-    addBtn.addEventListener('click', () => {
-      const draftKeyBase = 'novo-item';
-      let idx = 1;
-      let newKey = draftKeyBase;
-      while (original[newKey]) { newKey = `${draftKeyBase}-${idx++}`; }
-      original[newKey] = { title: 'Novo Item', description: '', images: [] };
-      renderItems(container, original);
-    });
-  }
-
-  // ===== Menu Admin =====
-  function renderMenuItems(container, data) {
-    container.innerHTML = '';
-    const items = Array.isArray(data?.items) ? data.items : [];
-    items.forEach((item, idx) => {
-      const card = document.createElement('div');
-      card.className = 'admin-card';
-      card.innerHTML = `
-        <div class="field"><label>Label</label>
-          <input type="text" data-menu-index="${idx}" data-field="label" value="${(item.label||'').replace(/\"/g,'&quot;')}">
-        </div>
-        <div class="field"><label>Destino (href)</label>
-          <input type="text" data-menu-index="${idx}" data-field="href" value="${(item.href||'').replace(/\"/g,'&quot;')}">
-        </div>
-        <div class="field"><label>Identificador (id/section)</label>
-          <input type="text" data-menu-index="${idx}" data-field="id" value="${(item.id||'').replace(/\"/g,'&quot;')}">
-        </div>
-        <div class="field"><label><input type="checkbox" data-menu-index="${idx}" data-field="visible" ${item.visible!==false?'checked':''}> Visível</label></div>
-        <div class="actions">
-          <button class="btn btn-sm" data-menu-action="up" data-index="${idx}">&#9650;</button>
-          <button class="btn btn-sm" data-menu-action="down" data-index="${idx}">&#9660;</button>
-          <button class="btn btn-sm" data-menu-action="remove" data-index="${idx}">Remover</button>
-        </div>
-      `;
-      container.appendChild(card);
-    });
-  }
-
-  function collectMenu(container, original) {
-    const data = { items: [] };
-    const cards = Array.from(container.querySelectorAll('.admin-card'));
-    cards.forEach((card) => {
-      const get = (sel) => card.querySelector(sel);
-      const label = get('input[data-field="label"]')?.value || '';
-      const href = get('input[data-field="href"]')?.value || '';
-      const id = get('input[data-field="id"]')?.value || '';
-      const visible = !!get('input[data-field="visible"]')?.checked;
-      data.items.push({ label, href, id, visible });
-    });
-    return data;
-  }
-
-  if (menuContainer) {
-    // reorder/remove menu items
-    menuContainer.addEventListener('click', (e) => {
-      const btn = e.target.closest('button');
-      if (!btn) return;
-      const action = btn.getAttribute('data-menu-action');
-      const idx = parseInt(btn.getAttribute('data-index'), 10);
-      const items = originalMenu.items || [];
-      if (action === 'remove') {
-        items.splice(idx, 1);
-      } else if (action === 'up' && idx > 0) {
-        [items[idx-1], items[idx]] = [items[idx], items[idx-1]];
-      } else if (action === 'down' && idx < items.length - 1) {
-        [items[idx+1], items[idx]] = [items[idx], items[idx+1]];
-      }
-      originalMenu.items = items;
-      renderMenuItems(menuContainer, originalMenu);
-    });
-
-    // add new menu item
-    const addMenuBtn = document.getElementById('addMenuItem');
-    if (addMenuBtn) addMenuBtn.addEventListener('click', () => {
-      if (!originalMenu.items) originalMenu.items = [];
-      originalMenu.items.push({ label: 'Novo', href: '#', id: '', visible: true });
-      renderMenuItems(menuContainer, originalMenu);
-    });
-
-    // import/export menu
-    const importMenu = document.getElementById('importMenu');
-    if (importMenu) importMenu.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        originalMenu = JSON.parse(await file.text());
-        renderMenuItems(menuContainer, originalMenu);
-      } catch (err) {
-        alert('Menu JSON inválido');
-      }
-    });
-    const downloadMenu = document.getElementById('downloadMenu');
-    if (downloadMenu) downloadMenu.addEventListener('click', () => {
-      const data = collectMenu(menuContainer, originalMenu);
-      download('menu.json', JSON.stringify(data, null, 2));
-    });
-    const saveMenuFs = document.getElementById('saveMenuFs');
-    if (saveMenuFs) saveMenuFs.addEventListener('click', async () => {
-      const data = collectMenu(menuContainer, originalMenu);
-      await saveJSONWithPersist('menu.json', JSON.stringify(data, null, 2));
-    });
-  }
+  document.addEventListener('input', event => { if (!event.target.matches('[data-bind]')) return; setPath(event.target.dataset.bind, parseSpecial(event.target.dataset.bind, event.target.value)); });
+  document.addEventListener('change', event => { if (!event.target.matches('[data-bind]')) return; setPath(event.target.dataset.bind, event.target.type === 'checkbox' ? event.target.checked : parseSpecial(event.target.dataset.bind, event.target.value)); });
+  document.addEventListener('click', event => { const tab = event.target.closest('[data-tab]'); const add = event.target.closest('[data-add]'); const remove = event.target.closest('[data-remove]'); if (tab) { activeTab = tab.dataset.tab; renderTab(); } if (add) addItem(add.dataset.add); if (remove) removeItem(remove.dataset.remove, Number(remove.dataset.index)); });
+  $('#loginButton').addEventListener('click', () => { window.location.assign(`${apiBase}/auth/login`); });
+  $('#publishButton').addEventListener('click', () => publish().catch(error => notice(error.message, 'error')));
+  try { await loadContent(); await refreshSession(); } catch (error) { notice(error.message, 'error'); }
 });
-
-// ====== Permissões persistentes (IndexedDB + FS Access) ======
-async function openDB() {
-  return await new Promise((resolve, reject) => {
-    const req = indexedDB.open('admin-store', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('fs');
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function saveHandle(key, handle) {
-  const db = await openDB();
-  return await new Promise((resolve, reject) => {
-    const tx = db.transaction('fs', 'readwrite');
-    tx.objectStore('fs').put(handle, key);
-    tx.oncomplete = resolve;
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function loadHandle(key) {
-  const db = await openDB();
-  return await new Promise((resolve, reject) => {
-    const tx = db.transaction('fs', 'readonly');
-    const req = tx.objectStore('fs').get(key);
-    req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function ensurePermission(handle, write = true) {
-  try {
-    const opts = write ? { mode: 'readwrite' } : {};
-    const q = await handle.queryPermission?.(opts);
-    if (q === 'granted') return true;
-    if (q === 'prompt') {
-      const r = await handle.requestPermission?.(opts);
-      return r === 'granted';
-    }
-    if (!q && handle.requestPermission) {
-      const r = await handle.requestPermission(opts);
-      return r === 'granted';
-    }
-    return false;
-  } catch (_) {
-    return false;
-  }
-}
-
-async function saveJSONWithPersist(defaultFilename, jsonText) {
-  if (!('showSaveFilePicker' in window) && !('showDirectoryPicker' in window)) {
-    return download(defaultFilename, jsonText);
-  }
-  // Tenta pasta persistente
-  try {
-    let dir = await loadHandle('content-dir');
-    if (!dir) {
-      if (!window.showDirectoryPicker) throw new Error('no-dir');
-      dir = await window.showDirectoryPicker();
-      await saveHandle('content-dir', dir);
-    }
-    const ok = await ensurePermission(dir, true);
-    if (!ok) throw new Error('perm-dir');
-    const fileHandle = await dir.getFileHandle(defaultFilename, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(jsonText);
-    await writable.close();
-    alert('Gravado na pasta selecionada.');
-    return;
-  } catch (e) {}
-  // Ficheiro persistente
-  try {
-    let file = await loadHandle(defaultFilename + '-file');
-    if (!file) {
-      file = await window.showSaveFilePicker({
-        suggestedName: defaultFilename,
-        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
-      });
-      await saveHandle(defaultFilename + '-file', file);
-    }
-    const ok = await ensurePermission(file, true);
-    if (!ok) throw new Error('perm-file');
-    const writable = await file.createWritable();
-    await writable.write(jsonText);
-    await writable.close();
-    alert('Gravado no ficheiro selecionado.');
-  } catch (e) {
-    download(defaultFilename, jsonText);
-  }
-}
-
-
-
-
-

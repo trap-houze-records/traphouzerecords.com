@@ -1,0 +1,22 @@
+name = "trap-houze-cms"
+main = "src/index.js"
+compatibility_date = "2026-08-12"
+
+[vars]
+# URL onde o admin está publicado (sem barra final).
+ADMIN_ORIGIN = "https://traphouzerecords.com"
+REPO_OWNER = "trap-houze-records"
+REPO_NAME = "traphouzerecords.com"
+BRANCH = "main"
+CONTENT_PATH = "data/site.json"
+# Utilizadores GitHub autorizados a abrir o painel, separados por vírgula.
+ALLOWED_GITHUB_USERS = ""
+# ID da instalação da GitHub App neste repositório.
+GITHUB_INSTALLATION_ID = ""
+
+# Criar como secrets no Cloudflare, nunca neste ficheiro:
+# GITHUB_OAUTH_CLIENT_ID
+# GITHUB_OAUTH_CLIENT_SECRET
+# GITHUB_APP_ID
+# GITHUB_APP_PRIVATE_KEY
+# SESSION_SECRET (uma string aleatória longa)

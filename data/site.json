@@ -1,0 +1,54 @@
+{
+  "site": {
+    "name": "Trap Houze Records",
+    "tagline": "Estúdio profissional",
+    "location": "Porto, Portugal",
+    "email": "info@traphouze.com",
+    "instagram": "https://instagram.com/traphouzerecords",
+    "instagramHandle": "@traphouzerecords",
+    "whatsapp": "351910734914",
+    "bookingUrl": "https://tidycal.com/traphouzerecords",
+    "hours": "Segunda a Sábado, 10h–22h"
+  },
+  "navigation": [
+    { "id": "home", "label": "Home", "visible": true },
+    { "id": "services", "label": "Serviços", "visible": true },
+    { "id": "equipment", "label": "Equipamento", "visible": false },
+    { "id": "about", "label": "Quem somos", "visible": false },
+    { "id": "artists", "label": "Artistas", "visible": false },
+    { "id": "reviews", "label": "Avaliações", "visible": false }
+  ],
+  "hero": [
+    { "title": "Trap Houze Records", "subtitle": "Estúdio profissional", "image": "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=1920" },
+    { "title": "Trap Houze Records", "subtitle": "Mix & Master", "image": "https://images.unsplash.com/photo-1619983081563-430f63602796?w=1920" },
+    { "title": "Trap Houze Records", "subtitle": "Produção musical", "image": "https://images.unsplash.com/photo-1519892300165-cb5542fb47c7?w=1920" }
+  ],
+  "services": [
+    { "title": "Agendamento", "description": "Reserve o seu horário no nosso estúdio profissional.", "icon": "📅", "action": "booking", "visible": true },
+    { "title": "Sessão de Estúdio", "description": "Grave as suas tracks num ambiente profissional.", "icon": "🎤", "action": "booking", "visible": false },
+    { "title": "Sessão Fotográfica", "description": "Capte a essência do seu estilo com uma sessão profissional.", "icon": "📸", "action": "booking", "visible": false },
+    { "title": "Captação Guiada", "description": "Orientação profissional para extrair o melhor da sua performance.", "icon": "🎧", "action": "booking", "visible": false },
+    { "title": "Mix & Master", "description": "Tratamento profissional para qualidade de rádio e streaming.", "icon": "🎛️", "action": "whatsapp", "visible": true }
+  ],
+  "equipment": [
+    { "id": "midi", "title": "Teclados MIDI", "description": "Controladores MIDI profissionais de última geração.", "images": [] },
+    { "id": "microfones", "title": "Microfones profissionais", "description": "Coleção premium de microfones condensadores e dinâmicos.", "images": [] },
+    { "id": "monitores", "title": "Monitores de estúdio", "description": "Monitores de referência para uma escuta precisa.", "images": [] }
+  ],
+  "about": {
+    "title": "Trap Houze Records",
+    "paragraphs": [
+      "Somos um estúdio profissional dedicado à produção musical de qualidade superior.",
+      "Cada projeto é único — criamos um ambiente profissional e criativo para o levar mais longe."
+    ],
+    "image": "",
+    "stats": [
+      { "value": "500+", "label": "Projetos" },
+      { "value": "200+", "label": "Artistas" },
+      { "value": "5", "label": "Anos" },
+      { "value": "100%", "label": "Dedicação" }
+    ]
+  },
+  "artists": [],
+  "reviews": []
+}
