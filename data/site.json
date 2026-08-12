@@ -65,7 +65,7 @@
       "description": "Reserve o seu horário no nosso estúdio profissional.",
       "icon": "📅",
       "action": "booking",
-      "visible": true
+      "visible": false
     },
     {
       "title": "Sessão de Estúdio",
@@ -79,7 +79,7 @@
       "description": "Capte a essência do seu estilo com uma sessão profissional.",
       "icon": "📸",
       "action": "booking",
-      "visible": true
+      "visible": false
     },
     {
       "title": "Captação Guiada",
