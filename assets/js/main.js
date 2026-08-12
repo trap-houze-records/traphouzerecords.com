@@ -43,7 +43,7 @@ function renderReviews() {
 }
 
 function renderModal() { return `<div id="modal" class="modal"><div class="modal-content"><div class="modal-header"><h3 id="modalTitle"></h3><button class="close-modal" aria-label="Fechar">×</button></div><div class="modal-body"><div id="modalGallery" class="equipment-gallery"></div><p id="modalDescription" class="equipment-description"></p></div></div></div>`; }
-function renderBooking() { return `<div id="bookingPopup" class="popup-overlay"><div class="popup"><button class="close-btn" aria-label="Fechar">×</button><div class="popup-header"><h2 id="popupServiceTitle">Agendar sessão</h2></div><div class="popup-body"><a id="bookingLink" class="btn" target="_blank" rel="noopener">Abrir agenda</a></div></div></div>`; }
+function renderBooking() { return `<div id="bookingPopup" class="popup-overlay" aria-hidden="true"><div class="popup" role="dialog" aria-modal="true" aria-labelledby="popupServiceTitle"><button class="close-btn" aria-label="Fechar">×</button><div class="popup-header"><h2 id="popupServiceTitle">Agendar sessão</h2></div><div class="popup-body"><div class="tidycal-embed" data-path="traphouzerecords"></div></div></div></div>`; }
 
 function renderSite() {
   document.getElementById('site').innerHTML = `<nav><a href="#home" aria-label="Início"><img src="images/Logo.png" alt="${escapeHtml(content.site.name)}" class="nav-logo"></a><ul>${visibleNav().map(item => `<li><a href="#${escapeHtml(item.id)}">${escapeHtml(item.label)}</a></li>`).join('')}</ul></nav>${renderHero()}${renderServices()}${renderEquipment()}${renderAbout()}${renderArtists()}${renderReviews()}<footer><p>© ${new Date().getFullYear()} ${escapeHtml(content.site.name)}</p><p>${escapeHtml(content.site.location)}</p></footer><button class="help-button" aria-label="Contactos">?</button><div id="helpPopup" class="help-popup"><div class="help-popup-header"><h4>Contactos</h4><button class="close-help" aria-label="Fechar">×</button></div><div class="help-content"><a href="mailto:${escapeHtml(content.site.email)}">${escapeHtml(content.site.email)}</a><a href="${escapeHtml(content.site.instagram)}" target="_blank" rel="noopener">${escapeHtml(content.site.instagramHandle)}</a><a href="https://wa.me/${escapeHtml(content.site.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a><p>${escapeHtml(content.site.hours)}</p></div></div>${renderModal()}${renderBooking()}`;
@@ -57,12 +57,23 @@ function showEquipment(index) {
   document.getElementById('modal').classList.add('active');
 }
 function openBooking(service) {
-  const url = service.action === 'whatsapp'
-    ? `https://wa.me/${content.site.whatsapp}?text=${encodeURIComponent(`Olá Trap Houze! Quero marcar ${service.title}.`)}`
-    : content.site.bookingUrl;
-  window.open(url, '_blank', 'noopener');
+  if (service.action === 'whatsapp') {
+    window.open(`https://wa.me/${content.site.whatsapp}?text=${encodeURIComponent(`Olá Trap Houze! Quero marcar ${service.title}.`)}`, '_blank', 'noopener');
+    return;
+  }
+  const popup = document.getElementById('bookingPopup');
+  document.getElementById('popupServiceTitle').textContent = `Agendar ${service.title}`;
+  popup.classList.add('active');
+  popup.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
 }
-function closeOverlays() { document.querySelectorAll('.modal.active, .popup-overlay.active').forEach(element => element.classList.remove('active')); }
+function closeOverlays() {
+  document.querySelectorAll('.modal.active, .popup-overlay.active').forEach(element => {
+    element.classList.remove('active');
+    if (element.id === 'bookingPopup') element.setAttribute('aria-hidden', 'true');
+  });
+  document.body.style.overflow = '';
+}
 
 function bindEvents() {
   document.addEventListener('click', event => {
@@ -76,4 +87,4 @@ function bindEvents() {
 }
 function startSlides() { setInterval(() => { const slides = document.querySelectorAll('.slide'); if (!slides.length) return; slides[activeSlide].classList.remove('active'); activeSlide = (activeSlide + 1) % slides.length; slides[activeSlide].classList.add('active'); }, 5000); }
 
-fetch('data/site.json', { cache: 'no-store' }).then(response => { if (!response.ok) throw new Error('Não foi possível carregar o conteúdo.'); return response.json(); }).then(data => { content = data; renderSite(); bindEvents(); startSlides(); }).catch(error => { document.getElementById('site').innerHTML = `<main class="site-error">${escapeHtml(error.message)}</main>`; console.error(error); });
+fetch('data/site.json', { cache: 'no-store' }).then(response => { if (!response.ok) throw new Error('Não foi possível carregar o conteúdo.'); return response.json(); }).then(data => { content = data; renderSite(); bindEvents(); startSlides(); const script = document.createElement('script'); script.src = 'https://asset-tidycal.b-cdn.net/js/embed.js'; script.async = true; document.body.appendChild(script); }).catch(error => { document.getElementById('site').innerHTML = `<main class="site-error">${escapeHtml(error.message)}</main>`; console.error(error); });

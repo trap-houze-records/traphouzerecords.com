@@ -691,6 +691,7 @@ footer p {
     animation: fadeIn 0.3s ease;
     padding: 20px;
 }
+.popup-overlay.active { display: flex; }
 
 .popup {
     background: #111;
@@ -725,6 +726,7 @@ footer p {
     padding: 20px;
     flex: 1;
 }
+.tidycal-embed { min-height: 680px; }
 
 .close-btn {
     position: absolute;
