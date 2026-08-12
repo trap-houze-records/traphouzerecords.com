@@ -72,7 +72,7 @@
       "description": "Grave as suas tracks num ambiente profissional.",
       "icon": "🎤",
       "action": "booking",
-      "visible": false
+      "visible": true
     },
     {
       "title": "Sessão Fotográfica",
