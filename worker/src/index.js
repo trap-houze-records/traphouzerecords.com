@@ -178,13 +178,19 @@ async function portalData(clientId, env) {
 async function clientLogin(request, env) {
   let body;
   try { body = await request.json(); } catch { return error('Pedido inválido.'); }
-  const username = String(body.username || '').trim().toLowerCase();
+  const identity = String(body.username || '').trim().toLowerCase();
   const password = String(body.password || '');
-  const row = await clientDb(env).prepare('SELECT id, password_hash, password_salt, active FROM clients WHERE username = ? COLLATE NOCASE').bind(username).first();
+  const db = clientDb(env);
+  let row = await db.prepare('SELECT id, password_hash, password_salt, active FROM clients WHERE username = ? COLLATE NOCASE').bind(identity).first();
+  if (!row) {
+    const matches = await db.prepare('SELECT id, password_hash, password_salt, active FROM clients WHERE display_name = ? COLLATE NOCASE LIMIT 2').bind(identity).all();
+    if (matches.results.length > 1) return error('Existem várias contas com este nome. Use o utilizador fornecido pela Trap Houze Records.', 401);
+    row = matches.results[0];
+  }
   if (!row || !row.active || !await passwordMatches(password, row.password_hash, row.password_salt)) return error('Credenciais inválidas.', 401);
   const sessionId = randomId();
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 8).toISOString().replace('T', ' ').replace('Z', '');
-  await clientDb(env).prepare('INSERT INTO client_sessions (id, client_id, expires_at) VALUES (?, ?, ?)').bind(sessionId, row.id, expiresAt).run();
+  await db.prepare('INSERT INTO client_sessions (id, client_id, expires_at) VALUES (?, ?, ?)').bind(sessionId, row.id, expiresAt).run();
   const token = await signedValue({ role: 'client', clientId: row.id, sessionId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 8 }, env);
   return jsonResponse({ token, portal: await portalData(row.id, env) });
 }
