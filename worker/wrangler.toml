@@ -10,9 +10,9 @@ REPO_NAME = "traphouzerecords.com"
 BRANCH = "main"
 CONTENT_PATH = "data/site.json"
 # Utilizadores GitHub autorizados a abrir o painel, separados por vírgula.
-ALLOWED_GITHUB_USERS = ""
+ALLOWED_GITHUB_USERS = "trap-houze-records"
 # ID da instalação da GitHub App neste repositório.
-GITHUB_INSTALLATION_ID = ""
+GITHUB_INSTALLATION_ID = "153174915"
 
 # Criar como secrets no Cloudflare, nunca neste ficheiro:
 # GITHUB_OAUTH_CLIENT_ID

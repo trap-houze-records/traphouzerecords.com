@@ -11,6 +11,10 @@ function decodeBase64Url(value) {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
   return Uint8Array.from(atob(normalized), char => char.charCodeAt(0));
 }
+function decodeBase64(value) {
+  const normalized = value.replace(/\s/g, '') + '='.repeat((4 - value.replace(/\s/g, '').length % 4) % 4);
+  return Uint8Array.from(atob(normalized), char => char.charCodeAt(0));
+}
 function jsonResponse(body, status = 200, headers = {}) { return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=UTF-8', ...headers } }); }
 function error(message, status = 400) { return jsonResponse({ error: message }, status); }
 function allowedOrigin(request, env) {
@@ -48,12 +52,15 @@ function secureCookie(name, value, seconds) { return `${name}=${encodeURICompone
 function redirect(url, headers = {}) { return new Response(null, { status: 302, headers: { location: url, ...headers } }); }
 
 async function github(request, path, options = {}) {
-  const response = await fetch(`https://api.github.com${path}`, { ...options, headers: { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', ...options.headers } });
-  if (!response.ok) throw new Error(`GitHub respondeu ${response.status}.`);
+  const response = await fetch(`https://api.github.com${path}`, { ...options, headers: { accept: 'application/vnd.github+json', 'user-agent': 'trap-houze-cms', 'x-github-api-version': '2022-11-28', ...options.headers } });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`GitHub respondeu ${response.status}: ${detail.slice(0, 240)}`);
+  }
   return response;
 }
 function pemToBuffer(pem) {
-  const body = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  const body = pem.replace(/-----BEGIN (?:RSA )?PRIVATE KEY-----|-----END (?:RSA )?PRIVATE KEY-----/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
   return Uint8Array.from(atob(body), char => char.charCodeAt(0));
 }
 async function appJwt(env) {
@@ -72,7 +79,9 @@ async function contentFromGitHub(env) {
   const token = await installationToken(env);
   const response = await github(null, `/repos/${env.REPO_OWNER}/${env.REPO_NAME}/contents/${env.CONTENT_PATH}?ref=${encodeURIComponent(env.BRANCH)}`, { headers: { authorization: `Bearer ${token}` } });
   const file = await response.json();
-  return { sha: file.sha, content: JSON.parse(decoder.decode(Uint8Array.from(atob(file.content.replace(/\n/g, '')), char => char.charCodeAt(0)))) };
+  const raw = await fetch(file.download_url, { headers: { accept: 'application/json' } });
+  if (!raw.ok) throw new Error('Não foi possível ler o conteúdo publicado.');
+  return { sha: file.sha, content: await raw.json() };
 }
 function validContent(content) {
   return content && typeof content === 'object' && content.site && Array.isArray(content.navigation) && Array.isArray(content.hero) && Array.isArray(content.services) && Array.isArray(content.equipment);
