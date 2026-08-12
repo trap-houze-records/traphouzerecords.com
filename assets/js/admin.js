@@ -1,6 +1,7 @@
 let draft;
 let activeTab = 'site';
 let csrfToken = '';
+let sessionToken = sessionStorage.getItem('th_cms_session') || '';
 const apiBase = (window.CMS_API_URL || '').replace(/\/$/, '');
 const tabs = [['site', 'Identidade'], ['menu', 'Menu'], ['hero', 'Destaques'], ['services', 'Serviços'], ['equipment', 'Equipamento'], ['about', 'Quem somos'], ['artists', 'Artistas'], ['reviews', 'Avaliações']];
 const $ = selector => document.querySelector(selector);
@@ -51,17 +52,23 @@ async function loadContent() {
 }
 async function refreshSession() {
   if (!apiBase) { notice('Pré-visualização local: configure o Worker para publicar.', 'muted'); return; }
-  try { const response = await fetch(`${apiBase}/auth/session`, { credentials: 'include' }); const session = await response.json(); if (session.authenticated) { csrfToken = session.csrf || ''; $('#authStatus').textContent = `Ligado como ${session.login}`; $('#publishButton').hidden = false; } else $('#loginButton').hidden = false; } catch { notice('Não foi possível ligar ao serviço de publicação.', 'error'); }
+  try { const response = await fetch(`${apiBase}/auth/session`, { headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {} }); const session = await response.json(); if (session.authenticated) { csrfToken = session.csrf || ''; $('#authStatus').textContent = `Ligado como ${session.login}`; $('#publishButton').hidden = false; } else $('#loginButton').hidden = false; } catch { notice('Não foi possível ligar ao serviço de publicação.', 'error'); }
 }
 async function publish() {
   notice('A publicar…');
-  const response = await fetch(`${apiBase}/publish`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CMS-CSRF': csrfToken }, body: JSON.stringify({ content: draft }) });
+  const response = await fetch(`${apiBase}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CMS-CSRF': csrfToken, Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ content: draft }) });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || 'A publicação falhou.');
   notice(`Publicado com sucesso. Commit ${result.commit.slice(0, 7)}. O GitHub Pages pode demorar um momento a atualizar.`, 'success');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  const tokenMatch = location.hash.match(/(?:^#|&)cms_session=([^&]+)/);
+  if (tokenMatch) {
+    sessionToken = decodeURIComponent(tokenMatch[1]);
+    sessionStorage.setItem('th_cms_session', sessionToken);
+    history.replaceState(null, '', location.pathname + location.search);
+  }
   document.addEventListener('input', event => { if (!event.target.matches('[data-bind]')) return; setPath(event.target.dataset.bind, parseSpecial(event.target.dataset.bind, event.target.value)); });
   document.addEventListener('change', event => { if (!event.target.matches('[data-bind]')) return; setPath(event.target.dataset.bind, event.target.type === 'checkbox' ? event.target.checked : parseSpecial(event.target.dataset.bind, event.target.value)); });
   document.addEventListener('click', event => { const tab = event.target.closest('[data-tab]'); const add = event.target.closest('[data-add]'); const remove = event.target.closest('[data-remove]'); if (tab) { activeTab = tab.dataset.tab; renderTab(); } if (add) addItem(add.dataset.add); if (remove) removeItem(remove.dataset.remove, Number(remove.dataset.index)); });

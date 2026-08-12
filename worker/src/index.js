@@ -22,7 +22,7 @@ function allowedOrigin(request, env) {
 }
 function corsHeaders(request, env) {
   const origin = allowedOrigin(request, env);
-  return origin ? { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET, POST, OPTIONS', vary: 'Origin' } : {};
+  return origin ? { 'access-control-allow-origin': origin, 'access-control-allow-headers': 'content-type, authorization, x-cms-csrf', 'access-control-allow-methods': 'GET, POST, OPTIONS', vary: 'Origin' } : {};
 }
 function withCors(response, request, env) {
   const headers = new Headers(response.headers);
@@ -47,6 +47,10 @@ async function readSignedValue(value, env) {
 function cookie(request, name) {
   const part = (request.headers.get('Cookie') || '').split(';').map(value => value.trim()).find(value => value.startsWith(`${name}=`));
   return part ? decodeURIComponent(part.slice(name.length + 1)) : '';
+}
+function sessionFromRequest(request, env) {
+  const bearer = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
+  return readSignedValue(bearer || cookie(request, 'th_session'), env);
 }
 function secureCookie(name, value, seconds) { return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${seconds}`; }
 function redirect(url, headers = {}) { return new Response(null, { status: 302, headers: { location: url, ...headers } }); }
@@ -108,15 +112,15 @@ async function callback(request, env) {
   const loginName = (await user.json()).login;
   const allowed = (env.ALLOWED_GITHUB_USERS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
   if (!allowed.includes(loginName.toLowerCase())) return error('Este utilizador não está autorizado a publicar.', 403);
-  const session = await signedValue({ login: loginName, csrf: crypto.randomUUID(), exp: Math.floor(Date.now() / 1000) + 60 * 60 * 8 }, env);
-  return redirect(`${env.ADMIN_ORIGIN}/admin.html`, { 'set-cookie': secureCookie('th_session', session, 60 * 60 * 8) });
+  const session = await signedValue({ login: loginName, csrf: crypto.randomUUID(), exp: Math.floor(Date.now() / 1000) + 60 * 60 }, env);
+  return redirect(`${env.ADMIN_ORIGIN}/admin.html#cms_session=${encodeURIComponent(session)}`);
 }
 async function session(request, env) {
-  const value = await readSignedValue(cookie(request, 'th_session'), env);
+  const value = await sessionFromRequest(request, env);
   return jsonResponse(value ? { authenticated: true, login: value.login, csrf: value.csrf } : { authenticated: false });
 }
 async function publish(request, env) {
-  const user = await readSignedValue(cookie(request, 'th_session'), env);
+  const user = await sessionFromRequest(request, env);
   if (!user) return error('Inicie sessão para publicar.', 401);
   if (request.headers.get('Origin') !== env.ADMIN_ORIGIN) return error('Origem não autorizada.', 403);
   if (!user.csrf || request.headers.get('x-cms-csrf') !== user.csrf) return error('Pedido de publicação inválido.', 403);
