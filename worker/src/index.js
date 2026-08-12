@@ -254,6 +254,10 @@ async function portalAdminMutation(request, env, resource, id) {
   if (resource === 'clients') {
     const current = await db.prepare('SELECT id FROM clients WHERE id = ?').bind(id).first();
     if (!current) return error('Cliente não encontrado.', 404);
+    if (request.method === 'DELETE') {
+      await db.prepare('DELETE FROM clients WHERE id = ?').bind(id).run();
+      return jsonResponse({ ok: true });
+    }
     const name = String(body.name || '').trim();
     const phone = String(body.phone || '').replace(/\D/g, '');
     if (!name || (phone && !/^\d{9,15}$/.test(phone))) return error('Dados de cliente inválidos.');

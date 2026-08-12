@@ -903,6 +903,8 @@ footer p {
 .manager-password { display: grid; grid-template-columns: 1fr auto; }
 .manager-password button { border: 1px solid rgba(255,255,255,.2); border-left: 0; background: #242424; color: #fff; cursor: pointer; padding: 0 10px; font-size: .76rem; }
 .manager-copy { margin-top: 8px; text-align: center; }
+.manager-delete { width: 100%; margin-top: 10px; border: 1px solid rgba(255, 96, 96, .7); background: transparent; color: #ff9b9b; cursor: pointer; font: inherit; padding: 12px; text-align: center; }
+.manager-delete:hover { background: rgba(255, 96, 96, .12); }
 .manager-credential-actions { display: grid; gap: 8px; margin-top: 8px; }
 .manager-credential-actions .manager-copy { margin-top: 0; }
 .manager-security-note { margin: 12px 0 18px; color: rgba(255,255,255,.5); font-size: .75rem; line-height: 1.5; }
