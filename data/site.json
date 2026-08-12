@@ -24,7 +24,7 @@
     {
       "id": "equipment",
       "label": "Equipamento",
-      "visible": true
+      "visible": false
     },
     {
       "id": "about",
@@ -65,14 +65,14 @@
       "description": "Reserve o seu horário no nosso estúdio profissional.",
       "icon": "📅",
       "action": "booking",
-      "visible": false
+      "visible": true
     },
     {
       "title": "Sessão de Estúdio",
       "description": "Grave as suas tracks num ambiente profissional.",
       "icon": "🎤",
       "action": "booking",
-      "visible": true
+      "visible": false
     },
     {
       "title": "Sessão Fotográfica",
@@ -86,7 +86,7 @@
       "description": "Orientação profissional para extrair o melhor da sua performance.",
       "icon": "🎧",
       "action": "booking",
-      "visible": true
+      "visible": false
     },
     {
       "title": "Mix & Master",
