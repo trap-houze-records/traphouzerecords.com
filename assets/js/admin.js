@@ -1,9 +1,11 @@
 let draft;
+let contentLoaded = false;
 let activeTab = 'site';
 let activeModule = new URLSearchParams(location.search).get('section') === 'clients' ? 'clients' : (sessionStorage.getItem('th_admin_requested_module') || 'dashboard');
 let csrfToken = '';
 let sessionToken = sessionStorage.getItem('th_cms_session') || '';
 const apiBase = (window.CMS_API_URL || '').replace(/\/$/, '');
+const isLocalPreview = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const tabs = [['site', 'Identidade'], ['menu', 'Menu'], ['hero', 'Destaques'], ['services', 'Serviços'], ['equipment', 'Equipamento'], ['about', 'Quem somos'], ['artists', 'Artistas'], ['reviews', 'Avaliações']];
 const modules = [['dashboard', 'Dashboard'], ['site', 'Editar site'], ['clients', 'Clientes']];
 const $ = selector => document.querySelector(selector);
@@ -47,10 +49,11 @@ function parseSpecial(path, value) { if (path.endsWith('.images')) return value.
 function notice(message, kind = '') { const element = $('#notice'); element.textContent = message; element.className = `admin-notice ${kind}`; }
 
 async function loadContent() {
-  const url = apiBase ? `${apiBase}/content` : 'data/site.json';
+  const url = isLocalPreview ? 'data/site.json' : (apiBase ? `${apiBase}/content` : 'data/site.json');
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) throw new Error('Não foi possível carregar o conteúdo.');
   draft = await response.json();
+  contentLoaded = true;
   if (activeModule === 'site') renderTab();
 }
 async function refreshSession() {
@@ -60,6 +63,7 @@ async function refreshSession() {
     const session = await response.json();
     if (!session.authenticated) { $('#loginButton').hidden = false; return false; }
     csrfToken = session.csrf || '';
+    $('#loginButton').hidden = true;
     $('#authStatus').textContent = `Ligado como ${session.login}`;
     $('#publishButton').hidden = false;
     return true;
@@ -70,12 +74,13 @@ async function refreshSession() {
 }
 
 function renderModules() {
-  $('#adminModules').innerHTML = modules.map(([id, label]) => `<button class="admin-module ${id === activeModule ? 'active' : ''}" data-module="${id}">${label}</button>`).join('');
+  $('#adminModules').innerHTML = `<span class="admin-nav-label">Áreas</span>${modules.map(([id, label]) => `<button class="admin-module ${id === activeModule ? 'active' : ''}" data-module="${id}">${label}</button>`).join('')}`;
 }
 function renderDashboard() {
   $('#adminTabs').hidden = true;
   $('#publishButton').hidden = true;
-  $('#adminContent').innerHTML = `<section class="admin-dashboard"><article class="admin-dashboard-card admin-dashboard-primary"><p class="eyebrow">Trap Houze Records</p><h2>Gestão centralizada.</h2><p>Escolhe uma área para editar o site ou acompanhar o trabalho dos teus clientes.</p></article><button class="admin-dashboard-card" type="button" data-module="site"><span>01</span><h2>Editar site</h2><p>Conteúdos, navegação, destaques e publicação.</p><b>Abrir →</b></button><button class="admin-dashboard-card" type="button" data-module="clients"><span>02</span><h2>Clientes</h2><p>Contas, músicas, reservas e pagamentos.</p><b>Abrir →</b></button><article class="admin-dashboard-card admin-dashboard-soon"><span>Em breve</span><h2>Dashboard</h2><p>Indicadores de reservas, pagamentos e atividade do estúdio.</p></article></section>`;
+  $('#adminContent').innerHTML = `<section class="studio-dashboard"><header class="studio-dashboard-heading"><div><p class="eyebrow">Visão operacional</p><h2>Hoje no estúdio</h2><p>O essencial do dia, sem distrações.</p></div><span class="studio-live">Sistema ativo</span></header><div class="studio-stats"><article><span>Clientes ativos</span><strong id="dashboardClientCount">—</strong><small>na Área do Cliente</small></article><article><span>Trabalhos pendentes</span><strong>—</strong><small>Em breve</small></article><article><span>Reservas</span><strong>—</strong><small>Em breve</small></article><article><span>Pagamentos pendentes</span><strong>—</strong><small>Em breve</small></article></div><div class="studio-dashboard-grid"><section class="studio-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Começar</p><h3>Gestão do estúdio</h3></div></div><button type="button" class="studio-action" data-module="clients"><span>01</span><div><strong>Gerir clientes</strong><small>Contas, músicas, reservas e pagamentos.</small></div><b>→</b></button><button type="button" class="studio-action" data-module="site"><span>02</span><div><strong>Editar site</strong><small>Conteúdos, navegação e publicação.</small></div><b>→</b></button></section><section class="studio-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Próximas funções</p><h3>Em preparação</h3></div></div><ul class="studio-roadmap"><li><span>Agenda interna</span><small>Reservas e disponibilidade do estúdio.</small></li><li><span>Resumo financeiro</span><small>Pagamentos, faturação e valores em falta.</small></li><li><span>Atividade recente</span><small>Histórico centralizado do estúdio.</small></li></ul></section></div></section>`;
+  fetch(`${apiBase}/client/admin/clients`, { headers: { Authorization: `Bearer ${sessionToken}` } }).then(response => response.ok ? response.json() : null).then(result => { const count = $('#dashboardClientCount'); if (count) count.textContent = result ? result.clients.filter(client => client.active).length : '—'; }).catch(() => {});
 }
 function renderClients() {
   $('#adminTabs').hidden = true;
@@ -91,18 +96,22 @@ function selectModule(module) {
   if (module === 'dashboard') return renderDashboard();
   if (module === 'clients') return renderClients();
   $('#adminTabs').hidden = false;
-  $('#publishButton').hidden = false;
-  renderTab();
+  $('#publishButton').hidden = isLocalPreview;
+  if (contentLoaded) return renderTab();
+  $('#adminContent').innerHTML = '<p class="admin-hint">A carregar o conteúdo do site…</p>';
+  loadContent().catch(error => notice(error.message, 'error'));
 }
 function showEditor() {
   $('#adminTitle').textContent = 'Gerir o estúdio';
   $('#adminDescription').textContent = 'Conteúdos, clientes e operações, numa única área privada.';
   $('#adminModules').hidden = false;
   $('#adminContent').hidden = false;
+  document.body.classList.add('admin-ready');
   renderModules();
   selectModule(activeModule);
 }
 async function publish() {
+  if (isLocalPreview) { notice('Pré-visualização local: as alterações não podem ser publicadas daqui.', 'muted'); return; }
   notice('A publicar…');
   const response = await fetch(`${apiBase}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CMS-CSRF': csrfToken, Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ content: draft }) });
   const result = await response.json();
@@ -122,5 +131,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('click', event => { const module = event.target.closest('[data-module]'); const tab = event.target.closest('[data-tab]'); const add = event.target.closest('[data-add]'); const remove = event.target.closest('[data-remove]'); if (module) selectModule(module.dataset.module); if (tab) { activeTab = tab.dataset.tab; renderTab(); } if (add) addItem(add.dataset.add); if (remove) removeItem(remove.dataset.remove, Number(remove.dataset.index)); });
   $('#loginButton').addEventListener('click', () => { window.location.assign(`${apiBase}/auth/login`); });
   $('#publishButton').addEventListener('click', () => publish().catch(error => notice(error.message, 'error')));
-  try { if (await refreshSession()) { await loadContent(); showEditor(); } } catch (error) { notice(error.message, 'error'); }
+  try { if (await refreshSession()) { showEditor(); loadContent().catch(error => { if (activeModule === 'site') notice(error.message, 'error'); }); } } catch (error) { notice(error.message, 'error'); }
 });

@@ -11,7 +11,7 @@ Este documento descreve a passagem do protótipo local para uma Área do Cliente
 
 ## Segurança obrigatória antes de ativar
 
-- Nunca guardar palavras-passe em texto simples; guardar apenas hash PBKDF2 com salt individual.
+- Nunca guardar palavras-passe em texto simples; guardar apenas hash PBKDF2-SHA-256 com salt individual e 100 000 iterações (limite suportado pelo runtime Cloudflare).
 - Criar sessão curta assinada e HttpOnly; nunca colocar credenciais ou sessões no URL.
 - Limitar o administrador à sessão GitHub já existente no Worker.
 - Validar todos os dados no Worker e verificar origem/CORS.
@@ -41,3 +41,7 @@ Este documento descreve a passagem do protótipo local para uma Área do Cliente
 - `PATCH` e `DELETE` nas rotas de músicas/reservas: atualiza ou remove o respetivo registo.
 
 Estes endpoints existem apenas no código local até ser autorizada uma publicação do Worker. A página do cliente e o gestor já têm adaptadores para a API, mas mantêm o modo local até `assets/js/client-config.js` receber um URL de ensaio ou produção.
+
+## Entrada local de desenvolvimento
+
+O ficheiro ignorado `wrangler.local.toml` pode ativar `LOCAL_DEV_AUTH=true`. Nesse modo, e apenas quando o pedido chega a `127.0.0.1`, o Worker cria uma sessão fictícia `local-test-admin` para validar o painel sem copiar os segredos OAuth GitHub. A variável não existe na configuração publicada e não deve ser adicionada ao Worker online.

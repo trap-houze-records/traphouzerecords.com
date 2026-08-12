@@ -93,6 +93,11 @@ function validContent(content) {
 }
 
 async function login(request, env) {
+  // Apenas no Worker local: permite validar a interface sem copiar segredos OAuth.
+  if (env.LOCAL_DEV_AUTH === 'true' && new URL(request.url).hostname === '127.0.0.1') {
+    const session = await signedValue({ login: 'local-test-admin', csrf: crypto.randomUUID(), exp: Math.floor(Date.now() / 1000) + 60 * 60 }, env);
+    return redirect(`${env.ADMIN_ORIGIN}/admin.html#cms_session=${encodeURIComponent(session)}`);
+  }
   if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.SESSION_SECRET) return error('O Worker ainda não foi configurado.', 503);
   const state = await signedValue({ exp: Math.floor(Date.now() / 1000) + 600, nonce: crypto.randomUUID() }, env);
   const callback = new URL('/auth/callback', new URL(request.url).origin).toString();
@@ -131,7 +136,8 @@ function bytesFromBase64(value) { return decodeBase64Url(value); }
 async function passwordHash(password, salt = crypto.getRandomValues(new Uint8Array(16))) {
   if (typeof password !== 'string' || password.length < 10) throw inputError('A palavra-passe deve ter pelo menos 10 caracteres.');
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 310000, hash: 'SHA-256' }, key, 256);
+  // O runtime Cloudflare limita PBKDF2 a 100 000 iterações.
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, key, 256);
   return { hash: textToBase64(bits), salt: textToBase64(salt) };
 }
 async function passwordMatches(password, hash, salt) {
