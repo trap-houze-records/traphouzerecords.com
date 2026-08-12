@@ -46,7 +46,7 @@ function notice(message, kind = '') { const element = $('#notice'); element.text
 
 async function loadContent() {
   const url = apiBase ? `${apiBase}/content` : 'data/site.json';
-  const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+  const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) throw new Error('Não foi possível carregar o conteúdo.');
   draft = await response.json(); renderTab();
 }
