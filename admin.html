@@ -13,13 +13,15 @@
       <a href="index.html"><img src="images/Logo.png" alt="Trap Houze Records" class="nav-logo"></a>
       <div><span id="authStatus">Acesso protegido</span><button id="loginButton" class="btn btn-sm" hidden>Entrar</button><button id="publishButton" class="btn btn-sm" hidden>Publicar</button></div>
     </header>
-    <section class="admin-intro"><p class="eyebrow">Painel de conteúdo</p><h1 id="adminTitle">Área de administração</h1><p id="adminDescription">Inicie sessão com a conta GitHub autorizada para editar e publicar.</p></section>
+    <section class="admin-intro"><p class="eyebrow">Painel de administração</p><h1 id="adminTitle">Área de administração</h1><p id="adminDescription">Inicie sessão com a conta GitHub autorizada para gerir o estúdio.</p></section>
     <div id="notice" class="admin-notice" role="status"></div>
+    <nav id="adminModules" class="admin-modules" aria-label="Áreas de administração" hidden></nav>
     <nav id="adminTabs" class="admin-tabs" aria-label="Secções do painel" hidden></nav>
     <div id="adminContent" hidden></div>
   </main>
   <script>window.CMS_API_URL = window.CMS_API_URL || '';</script>
   <script src="assets/js/admin-config.js?v=1" onerror="this.remove()"></script>
-  <script src="assets/js/admin.js?v=3" defer></script>
+  <script src="assets/js/admin-clients.js?v=1" defer></script>
+  <script src="assets/js/admin.js?v=4" defer></script>
 </body>
 </html>

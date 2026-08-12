@@ -1,9 +1,11 @@
 let draft;
 let activeTab = 'site';
+let activeModule = new URLSearchParams(location.search).get('section') === 'clients' ? 'clients' : (sessionStorage.getItem('th_admin_requested_module') || 'dashboard');
 let csrfToken = '';
 let sessionToken = sessionStorage.getItem('th_cms_session') || '';
 const apiBase = (window.CMS_API_URL || '').replace(/\/$/, '');
 const tabs = [['site', 'Identidade'], ['menu', 'Menu'], ['hero', 'Destaques'], ['services', 'Serviços'], ['equipment', 'Equipamento'], ['about', 'Quem somos'], ['artists', 'Artistas'], ['reviews', 'Avaliações']];
+const modules = [['dashboard', 'Dashboard'], ['site', 'Editar site'], ['clients', 'Clientes']];
 const $ = selector => document.querySelector(selector);
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const field = (label, path, value, type = 'text') => `<label class="admin-field"><span>${label}</span>${type === 'textarea' ? `<textarea data-bind="${path}" rows="4">${escapeHtml(value || '')}</textarea>` : `<input type="${type}" data-bind="${path}" value="${escapeHtml(value || '')}">`}</label>`;
@@ -48,7 +50,8 @@ async function loadContent() {
   const url = apiBase ? `${apiBase}/content` : 'data/site.json';
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) throw new Error('Não foi possível carregar o conteúdo.');
-  draft = await response.json(); renderTab();
+  draft = await response.json();
+  if (activeModule === 'site') renderTab();
 }
 async function refreshSession() {
   if (!apiBase) { notice('O serviço de publicação não está configurado.', 'error'); return false; }
@@ -65,11 +68,39 @@ async function refreshSession() {
     return false;
   }
 }
-function showEditor() {
-  $('#adminTitle').textContent = 'Editar o site';
-  $('#adminDescription').textContent = 'As alterações ficam em rascunho até carregar em publicar.';
+
+function renderModules() {
+  $('#adminModules').innerHTML = modules.map(([id, label]) => `<button class="admin-module ${id === activeModule ? 'active' : ''}" data-module="${id}">${label}</button>`).join('');
+}
+function renderDashboard() {
+  $('#adminTabs').hidden = true;
+  $('#publishButton').hidden = true;
+  $('#adminContent').innerHTML = `<section class="admin-dashboard"><article class="admin-dashboard-card admin-dashboard-primary"><p class="eyebrow">Trap Houze Records</p><h2>Gestão centralizada.</h2><p>Escolhe uma área para editar o site ou acompanhar o trabalho dos teus clientes.</p></article><button class="admin-dashboard-card" type="button" data-module="site"><span>01</span><h2>Editar site</h2><p>Conteúdos, navegação, destaques e publicação.</p><b>Abrir →</b></button><button class="admin-dashboard-card" type="button" data-module="clients"><span>02</span><h2>Clientes</h2><p>Contas, músicas, reservas e pagamentos.</p><b>Abrir →</b></button><article class="admin-dashboard-card admin-dashboard-soon"><span>Em breve</span><h2>Dashboard</h2><p>Indicadores de reservas, pagamentos e atividade do estúdio.</p></article></section>`;
+}
+function renderClients() {
+  $('#adminTabs').hidden = true;
+  $('#publishButton').hidden = true;
+  $('#adminContent').innerHTML = '<div id="clientModuleRoot"></div>';
+  window.ClientAdminModule.mount($('#clientModuleRoot'), { apiBase, getToken: () => sessionToken, getCsrf: () => csrfToken, onError: error => notice(error.message, 'error') }).catch(error => notice(error.message, 'error'));
+}
+function selectModule(module) {
+  activeModule = module;
+  sessionStorage.setItem('th_admin_requested_module', module);
+  history.replaceState(null, '', `${location.pathname}${module === 'clients' ? '?section=clients' : ''}`);
+  renderModules();
+  if (module === 'dashboard') return renderDashboard();
+  if (module === 'clients') return renderClients();
   $('#adminTabs').hidden = false;
+  $('#publishButton').hidden = false;
+  renderTab();
+}
+function showEditor() {
+  $('#adminTitle').textContent = 'Gerir o estúdio';
+  $('#adminDescription').textContent = 'Conteúdos, clientes e operações, numa única área privada.';
+  $('#adminModules').hidden = false;
   $('#adminContent').hidden = false;
+  renderModules();
+  selectModule(activeModule);
 }
 async function publish() {
   notice('A publicar…');
@@ -88,8 +119,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   document.addEventListener('input', event => { if (!event.target.matches('[data-bind]')) return; setPath(event.target.dataset.bind, parseSpecial(event.target.dataset.bind, event.target.value)); });
   document.addEventListener('change', event => { if (!event.target.matches('[data-bind]')) return; setPath(event.target.dataset.bind, event.target.type === 'checkbox' ? event.target.checked : parseSpecial(event.target.dataset.bind, event.target.value)); });
-  document.addEventListener('click', event => { const tab = event.target.closest('[data-tab]'); const add = event.target.closest('[data-add]'); const remove = event.target.closest('[data-remove]'); if (tab) { activeTab = tab.dataset.tab; renderTab(); } if (add) addItem(add.dataset.add); if (remove) removeItem(remove.dataset.remove, Number(remove.dataset.index)); });
+  document.addEventListener('click', event => { const module = event.target.closest('[data-module]'); const tab = event.target.closest('[data-tab]'); const add = event.target.closest('[data-add]'); const remove = event.target.closest('[data-remove]'); if (module) selectModule(module.dataset.module); if (tab) { activeTab = tab.dataset.tab; renderTab(); } if (add) addItem(add.dataset.add); if (remove) removeItem(remove.dataset.remove, Number(remove.dataset.index)); });
   $('#loginButton').addEventListener('click', () => { window.location.assign(`${apiBase}/auth/login`); });
   $('#publishButton').addEventListener('click', () => publish().catch(error => notice(error.message, 'error')));
-  try { if (await refreshSession()) { showEditor(); await loadContent(); } } catch (error) { notice(error.message, 'error'); }
+  try { if (await refreshSession()) { await loadContent(); showEditor(); } } catch (error) { notice(error.message, 'error'); }
 });
