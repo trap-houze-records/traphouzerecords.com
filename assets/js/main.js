@@ -1,215 +1,81 @@
-// ===== MENU DINÂMICO =====
-let menuData = null;
-async function loadMenu() {
-  try {
-    const res = await fetch('data/menu.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    menuData = await res.json();
-  } catch (e) {
-    console.warn('Falha a carregar menu.json, usando nav existente', e);
-  }
+let content;
+let activeSlide = 0;
+
+const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
+const visibleNav = () => content.navigation.filter(item => item.visible);
+const sectionVisible = id => visibleNav().some(item => item.id === id);
+
+function renderHero() {
+  return `<section id="home" class="hero-slider">${content.hero.map((slide, index) => `
+    <div class="slide ${index === 0 ? 'active' : ''}" style="background-image:url('${escapeHtml(slide.image)}')">
+      <div class="slide-content"><h1 class="logo-text">${escapeHtml(slide.title)}</h1><p class="slide-subtitle">${escapeHtml(slide.subtitle)}</p></div>
+    </div>`).join('')}</section>`;
 }
 
-function renderMenu() {
-  const ul = document.querySelector('nav ul');
-  if (!ul || !menuData?.items) return;
-  ul.innerHTML = '';
-  menuData.items.forEach(item => {
-    if (!item.visible) return;
-    const li = document.createElement('li');
-    li.setAttribute('data-section-link', item.id || '');
-    const a = document.createElement('a');
-    a.href = item.href || '#';
-    a.textContent = item.label || item.id || '';
-    li.appendChild(a);
-    ul.appendChild(li);
-  });
-
-  // Controla visibilidade das secções conforme menu
-  if (menuData?.items) {
-    menuData.items.forEach(item => {
-      const section = item.id ? document.getElementById(item.id) : null;
-      if (section) section.style.display = item.visible ? 'block' : 'none';
-    });
-  }
+function renderServices() {
+  const services = content.services.filter(service => service.visible);
+  if (!sectionVisible('services') || !services.length) return '';
+  return `<section id="services" class="services"><h2 class="section-title">Serviços</h2><div class="service-grid">${services.map((service, index) => `
+    <article class="service-card"><div><div class="service-icon">${escapeHtml(service.icon)}</div><h3>${escapeHtml(service.title)}</h3><p>${escapeHtml(service.description)}</p></div>
+    <button class="btn" data-service="${index}">${service.action === 'whatsapp' ? 'Contactar' : 'Reservar'}</button></article>`).join('')}</div></section>`;
 }
 
-// ========== SLIDESHOW ==========
-let currentSlide = 0;
-const slides = document.querySelectorAll(".slide");
-function showSlide(n) {
-  slides.forEach((slide) => slide.classList.remove("active"));
-  currentSlide = (n + slides.length) % slides.length;
-  slides[currentSlide].classList.add("active");
+function renderEquipment() {
+  if (!sectionVisible('equipment')) return '';
+  return `<section id="equipment" class="equipment"><h2 class="section-title">Equipamento</h2><div class="equipment-grid">${content.equipment.map((item, index) => `
+    <button class="equipment-item" data-equipment="${index}"><div class="equipment-icon">✦</div><h4>${escapeHtml(item.title)}</h4><p>Ver detalhes</p></button>`).join('')}</div></section>`;
 }
-setInterval(() => showSlide(currentSlide + 1), 5000);
 
-// ========== BOOKING ==========
-function bookService(service) {
-  const popup = document.getElementById("bookingPopup");
-  const title = document.getElementById("popupServiceTitle");
-  title.textContent = `Agendar ${service}`;
-  popup.style.display = "flex";
-  document.body.style.overflow = "hidden";
+function renderAbout() {
+  if (!sectionVisible('about')) return '';
+  const about = content.about;
+  return `<section id="about" class="about"><h2 class="section-title">Quem somos</h2><div class="about-content"><div class="about-text"><h3>${escapeHtml(about.title)}</h3>${about.paragraphs.map(paragraph => `<p>${escapeHtml(paragraph)}</p>`).join('')}<div class="about-stats">${about.stats.map(stat => `<div class="stat-item"><span class="stat-number">${escapeHtml(stat.value)}</span><span class="stat-label">${escapeHtml(stat.label)}</span></div>`).join('')}</div></div><div class="about-image">${about.image ? `<img src="${escapeHtml(about.image)}" alt="${escapeHtml(about.title)}">` : 'Imagem do estúdio'}</div></div></section>`;
 }
-function bookServiceMixMaster() {
-  const phone = "351910734914";
-  const message = "Ola Trap Houze! Quero marcar Mix & Master.";
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-  window.open(url, "_blank");
-}
-function closeBookingPopup() {
-  const popup = document.getElementById("bookingPopup");
-  popup.style.display = "none";
-  document.body.style.overflow = "auto";
-}
-document.getElementById("bookingPopup").addEventListener("click", function (e) {
-  if (e.target === this) closeBookingPopup();
-});
 
-// ========== EQUIPAMENTO MODAL ==========
-let equipmentData = {};
-function renderEquipmentGrid() {
-  const grid = document.getElementById('equipmentGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  Object.entries(equipmentData).forEach(([key, item]) => {
-    const el = document.createElement('div');
-    el.className = 'equipment-item';
-    el.setAttribute('onclick', `openModal('${key}')`);
-    el.innerHTML = `
-      <div class="equipment-icon">&#9733;</div>
-      <h4>${(item.title||key)}</h4>
-      <p>${item.images?.length ? 'Ver detalhes' : ''}</p>
-    `;
-    grid.appendChild(el);
+function renderArtists() {
+  if (!sectionVisible('artists') || !content.artists.length) return '';
+  return `<section id="artists" class="artists"><h2 class="section-title">Artistas</h2><div class="artists-grid">${content.artists.map(artist => `<article class="artist-item">${artist.image ? `<img class="artist-item-image" src="${escapeHtml(artist.image)}" alt="${escapeHtml(artist.name)}">` : '<div class="artist-item-image">FOTO</div>'}<div class="artist-item-name"><h4>${escapeHtml(artist.name)}</h4><p>${escapeHtml(artist.genre)}</p></div></article>`).join('')}</div></section>`;
+}
+
+function renderReviews() {
+  if (!sectionVisible('reviews') || !content.reviews.length) return '';
+  return `<section id="reviews" class="reviews"><h2 class="section-title">Avaliações</h2><div class="review-container">${content.reviews.map(review => `<article class="review-card"><div class="review-header"><span class="reviewer-name">${escapeHtml(review.name)}</span><span class="stars">★★★★★</span></div><p class="review-text">${escapeHtml(review.text)}</p></article>`).join('')}</div></section>`;
+}
+
+function renderModal() { return `<div id="modal" class="modal"><div class="modal-content"><div class="modal-header"><h3 id="modalTitle"></h3><button class="close-modal" aria-label="Fechar">×</button></div><div class="modal-body"><div id="modalGallery" class="equipment-gallery"></div><p id="modalDescription" class="equipment-description"></p></div></div></div>`; }
+function renderBooking() { return `<div id="bookingPopup" class="popup-overlay"><div class="popup"><button class="close-btn" aria-label="Fechar">×</button><div class="popup-header"><h2 id="popupServiceTitle">Agendar sessão</h2></div><div class="popup-body"><a id="bookingLink" class="btn" target="_blank" rel="noopener">Abrir agenda</a></div></div></div>`; }
+
+function renderSite() {
+  document.getElementById('site').innerHTML = `<nav><a href="#home" aria-label="Início"><img src="images/Logo.png" alt="${escapeHtml(content.site.name)}" class="nav-logo"></a><ul>${visibleNav().map(item => `<li><a href="#${escapeHtml(item.id)}">${escapeHtml(item.label)}</a></li>`).join('')}</ul></nav>${renderHero()}${renderServices()}${renderEquipment()}${renderAbout()}${renderArtists()}${renderReviews()}<footer><p>© ${new Date().getFullYear()} ${escapeHtml(content.site.name)}</p><p>${escapeHtml(content.site.location)}</p></footer><button class="help-button" aria-label="Contactos">?</button><div id="helpPopup" class="help-popup"><div class="help-popup-header"><h4>Contactos</h4><button class="close-help" aria-label="Fechar">×</button></div><div class="help-content"><a href="mailto:${escapeHtml(content.site.email)}">${escapeHtml(content.site.email)}</a><a href="${escapeHtml(content.site.instagram)}" target="_blank" rel="noopener">${escapeHtml(content.site.instagramHandle)}</a><a href="https://wa.me/${escapeHtml(content.site.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a><p>${escapeHtml(content.site.hours)}</p></div></div>${renderModal()}${renderBooking()}`;
+}
+
+function showEquipment(index) {
+  const item = content.equipment[index];
+  document.getElementById('modalTitle').textContent = item.title;
+  document.getElementById('modalDescription').textContent = item.description;
+  document.getElementById('modalGallery').innerHTML = item.images.map(image => `<img class="equipment-image" src="${escapeHtml(image)}" alt="${escapeHtml(item.title)}">`).join('');
+  document.getElementById('modal').classList.add('active');
+}
+function openBooking(service) {
+  const popup = document.getElementById('bookingPopup');
+  document.getElementById('popupServiceTitle').textContent = `Agendar ${service.title}`;
+  const link = document.getElementById('bookingLink');
+  link.href = service.action === 'whatsapp' ? `https://wa.me/${content.site.whatsapp}?text=${encodeURIComponent(`Olá Trap Houze! Quero marcar ${service.title}.`)}` : content.site.bookingUrl;
+  link.textContent = service.action === 'whatsapp' ? 'Abrir WhatsApp' : 'Abrir agenda';
+  popup.classList.add('active');
+}
+function closeOverlays() { document.querySelectorAll('.modal.active, .popup-overlay.active').forEach(element => element.classList.remove('active')); }
+
+function bindEvents() {
+  document.addEventListener('click', event => {
+    const service = event.target.closest('[data-service]');
+    const equipment = event.target.closest('[data-equipment]');
+    if (service) openBooking(content.services[Number(service.dataset.service)]);
+    if (equipment) showEquipment(Number(equipment.dataset.equipment));
+    if (event.target.closest('.close-modal, .close-btn') || event.target.matches('.modal, .popup-overlay')) closeOverlays();
+    if (event.target.closest('.help-button, .close-help')) document.getElementById('helpPopup').classList.toggle('active');
   });
 }
+function startSlides() { setInterval(() => { const slides = document.querySelectorAll('.slide'); if (!slides.length) return; slides[activeSlide].classList.remove('active'); activeSlide = (activeSlide + 1) % slides.length; slides[activeSlide].classList.add('active'); }, 5000); }
 
-// Carrega dados do ficheiro JSON
-fetch('data/equipment.json')
-  .then((r) => r.json())
-  .then((data) => {
-    equipmentData = data || {};
-    renderEquipmentGrid();
-  })
-  .catch((err) => { console.error('Falha ao carregar equipment.json', err); });
-
-// Inicialização dependente do DOM
-window.addEventListener('DOMContentLoaded', async () => {
-  await loadMenu();
-  renderMenu();
-});
-function openModal(type) {
-  const modal = document.getElementById("equipmentModal");
-  const data = equipmentData[type];
-  if (!data) return;
-  document.getElementById("modalTitle").textContent = data.title;
-  document.getElementById("modalDescription").textContent = data.description;
-  const gallery = document.getElementById("modalGallery");
-  gallery.innerHTML = "";
-  data.images.forEach((src) => {
-    const imgEl = document.createElement("img");
-    imgEl.src = src;
-    imgEl.className = "equipment-image";
-    imgEl.alt = data.title;
-    gallery.appendChild(imgEl);
-  });
-  modal.classList.add("active");
-  document.body.style.overflow = "hidden";
-}
-function closeModal() {
-  document.getElementById("equipmentModal").classList.remove("active");
-  document.body.style.overflow = "auto";
-}
-document.getElementById("equipmentModal").addEventListener("click", function (e) {
-  if (e.target === this) closeModal();
-});
-
-// ========== ARTISTAS MODAL ==========
-const artistsData = {
-  artist1: {
-    name: "MC Flow",
-    genre: "Trap | Hip-Hop",
-    trajectory:
-      "<p>Comecou em 2020 e destacou-se na cena trap nacional, somando centenas de milhares de streams.</p>",
-    testimonial:
-      "<p>A Trap Houze Records elevou a qualidade do meu som e profissionalizou o meu processo.</p>",
-  },
-  artist2: {
-    name: "Lil Trap",
-    genre: "Trap | Drill",
-    trajectory:
-      "<p>Artista com varias colabs de peso e projetos gravados em estudios profissionais.</p>",
-    testimonial:
-      "<p>O ambiente e o som da Trap Houze dao vontade de criar hits atras de hits.</p>",
-  },
-  artist3: {
-    name: "DJ Beats",
-    genre: "Producer | Beatmaker",
-    trajectory:
-      "<p>Responsavel por producoes para diversos artistas, sempre a inovar no som.</p>",
-    testimonial:
-      "<p>A Trap Houze da-me as condicoes perfeitas para produzir e finalizar instrumentais de alto nivel.</p>",
-  },
-  artist4: {
-    name: "Rapper King",
-    genre: "Rap | Hip-Hop",
-    trajectory:
-      "<p>Nova escola com barras fortes e presenca em varios palcos nacionais.</p>",
-    testimonial:
-      "<p>Gravar aqui fez a diferenca na rececao do meu trabalho.</p>",
-  },
-  artist5: {
-    name: "Producer Pro",
-    genre: "Producer | Mix Engineer",
-    trajectory:
-      "<p>Anos de experiencia em mix e master de projetos de referencia.</p>",
-    testimonial:
-      "<p>Setup tecnico da Trap Houze ao nivel dos grandes estudios.</p>",
-  },
-  artist6: {
-    name: "Artista X",
-    genre: "Trap Soul | R&B",
-    trajectory:
-      "<p>Voz melodica com fusao de trap e R&B, com registos em estudio profissional.</p>",
-    testimonial:
-      "<p>A vibe do espaco ajuda-me a entrar no mood certo para gravar.</p>",
-  },
-};
-function openArtistModal(id) {
-  const data = artistsData[id];
-  if (!data) return;
-  document.getElementById("artistName").textContent = data.name;
-  document.getElementById("artistGenre").textContent = data.genre;
-  document.getElementById("artistTrajectory").innerHTML = data.trajectory;
-  document.getElementById("artistTestimonial").innerHTML = data.testimonial;
-  document.getElementById("artistModal").classList.add("active");
-  document.body.style.overflow = "hidden";
-}
-function closeArtistModal() {
-  document.getElementById("artistModal").classList.remove("active");
-  document.body.style.overflow = "auto";
-}
-document.getElementById("artistModal").addEventListener("click", function (e) {
-  if (e.target === this) closeArtistModal();
-});
-
-// ========== HELP POPUP ==========
-function toggleHelp() {
-  document.getElementById("helpPopup").classList.toggle("active");
-}
-document.addEventListener("click", function (e) {
-  const popup = document.getElementById("helpPopup");
-  const button = document.querySelector(".help-button");
-  if (!popup.contains(e.target) && !button.contains(e.target)) popup.classList.remove("active");
-});
-
-// ========== SMOOTH SCROLL ==========
-document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-  anchor.addEventListener("click", function (e) {
-    e.preventDefault();
-    const target = document.querySelector(this.getAttribute("href"));
-    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-});
+fetch('data/site.json', { cache: 'no-store' }).then(response => { if (!response.ok) throw new Error('Não foi possível carregar o conteúdo.'); return response.json(); }).then(data => { content = data; renderSite(); bindEvents(); startSlides(); }).catch(error => { document.getElementById('site').innerHTML = `<main class="site-error">${escapeHtml(error.message)}</main>`; console.error(error); });
