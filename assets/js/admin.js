@@ -51,8 +51,25 @@ async function loadContent() {
   draft = await response.json(); renderTab();
 }
 async function refreshSession() {
-  if (!apiBase) { notice('Pré-visualização local: configure o Worker para publicar.', 'muted'); return; }
-  try { const response = await fetch(`${apiBase}/auth/session`, { headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {} }); const session = await response.json(); if (session.authenticated) { csrfToken = session.csrf || ''; $('#authStatus').textContent = `Ligado como ${session.login}`; $('#publishButton').hidden = false; } else $('#loginButton').hidden = false; } catch { notice('Não foi possível ligar ao serviço de publicação.', 'error'); }
+  if (!apiBase) { notice('O serviço de publicação não está configurado.', 'error'); return false; }
+  try {
+    const response = await fetch(`${apiBase}/auth/session`, { headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {} });
+    const session = await response.json();
+    if (!session.authenticated) { $('#loginButton').hidden = false; return false; }
+    csrfToken = session.csrf || '';
+    $('#authStatus').textContent = `Ligado como ${session.login}`;
+    $('#publishButton').hidden = false;
+    return true;
+  } catch {
+    notice('Não foi possível ligar ao serviço de publicação.', 'error');
+    return false;
+  }
+}
+function showEditor() {
+  $('#adminTitle').textContent = 'Editar o site';
+  $('#adminDescription').textContent = 'As alterações ficam em rascunho até carregar em publicar.';
+  $('#adminTabs').hidden = false;
+  $('#adminContent').hidden = false;
 }
 async function publish() {
   notice('A publicar…');
@@ -74,5 +91,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('click', event => { const tab = event.target.closest('[data-tab]'); const add = event.target.closest('[data-add]'); const remove = event.target.closest('[data-remove]'); if (tab) { activeTab = tab.dataset.tab; renderTab(); } if (add) addItem(add.dataset.add); if (remove) removeItem(remove.dataset.remove, Number(remove.dataset.index)); });
   $('#loginButton').addEventListener('click', () => { window.location.assign(`${apiBase}/auth/login`); });
   $('#publishButton').addEventListener('click', () => publish().catch(error => notice(error.message, 'error')));
-  try { await loadContent(); await refreshSession(); } catch (error) { notice(error.message, 'error'); }
+  try { if (await refreshSession()) { showEditor(); await loadContent(); } } catch (error) { notice(error.message, 'error'); }
 });
