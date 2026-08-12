@@ -95,6 +95,7 @@ nav a:hover {
     position: relative;
     height: 100vh;
     overflow: hidden;
+    padding: 0;
 }
 
 .slide {
