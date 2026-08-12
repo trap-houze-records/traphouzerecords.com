@@ -48,7 +48,7 @@ function cookie(request, name) {
   const part = (request.headers.get('Cookie') || '').split(';').map(value => value.trim()).find(value => value.startsWith(`${name}=`));
   return part ? decodeURIComponent(part.slice(name.length + 1)) : '';
 }
-function secureCookie(name, value, seconds) { return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${seconds}`; }
+function secureCookie(name, value, seconds) { return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${seconds}`; }
 function redirect(url, headers = {}) { return new Response(null, { status: 302, headers: { location: url, ...headers } }); }
 
 async function github(request, path, options = {}) {
@@ -108,16 +108,18 @@ async function callback(request, env) {
   const loginName = (await user.json()).login;
   const allowed = (env.ALLOWED_GITHUB_USERS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
   if (!allowed.includes(loginName.toLowerCase())) return error('Este utilizador não está autorizado a publicar.', 403);
-  const session = await signedValue({ login: loginName, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 8 }, env);
+  const session = await signedValue({ login: loginName, csrf: crypto.randomUUID(), exp: Math.floor(Date.now() / 1000) + 60 * 60 * 8 }, env);
   return redirect(`${env.ADMIN_ORIGIN}/admin.html`, { 'set-cookie': secureCookie('th_session', session, 60 * 60 * 8) });
 }
 async function session(request, env) {
   const value = await readSignedValue(cookie(request, 'th_session'), env);
-  return jsonResponse(value ? { authenticated: true, login: value.login } : { authenticated: false });
+  return jsonResponse(value ? { authenticated: true, login: value.login, csrf: value.csrf } : { authenticated: false });
 }
 async function publish(request, env) {
   const user = await readSignedValue(cookie(request, 'th_session'), env);
   if (!user) return error('Inicie sessão para publicar.', 401);
+  if (request.headers.get('Origin') !== env.ADMIN_ORIGIN) return error('Origem não autorizada.', 403);
+  if (!user.csrf || request.headers.get('x-cms-csrf') !== user.csrf) return error('Pedido de publicação inválido.', 403);
   let payload;
   try { payload = await request.json(); } catch { return error('Pedido inválido.'); }
   if (!validContent(payload.content)) return error('O conteúdo enviado não tem a estrutura esperada.');

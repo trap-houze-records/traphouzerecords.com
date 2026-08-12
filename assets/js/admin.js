@@ -1,5 +1,6 @@
 let draft;
 let activeTab = 'site';
+let csrfToken = '';
 const apiBase = (window.CMS_API_URL || '').replace(/\/$/, '');
 const tabs = [['site', 'Identidade'], ['menu', 'Menu'], ['hero', 'Destaques'], ['services', 'Serviços'], ['equipment', 'Equipamento'], ['about', 'Quem somos'], ['artists', 'Artistas'], ['reviews', 'Avaliações']];
 const $ = selector => document.querySelector(selector);
@@ -50,11 +51,11 @@ async function loadContent() {
 }
 async function refreshSession() {
   if (!apiBase) { notice('Pré-visualização local: configure o Worker para publicar.', 'muted'); return; }
-  try { const response = await fetch(`${apiBase}/auth/session`, { credentials: 'include' }); const session = await response.json(); if (session.authenticated) { $('#authStatus').textContent = `Ligado como ${session.login}`; $('#publishButton').hidden = false; } else $('#loginButton').hidden = false; } catch { notice('Não foi possível ligar ao serviço de publicação.', 'error'); }
+  try { const response = await fetch(`${apiBase}/auth/session`, { credentials: 'include' }); const session = await response.json(); if (session.authenticated) { csrfToken = session.csrf || ''; $('#authStatus').textContent = `Ligado como ${session.login}`; $('#publishButton').hidden = false; } else $('#loginButton').hidden = false; } catch { notice('Não foi possível ligar ao serviço de publicação.', 'error'); }
 }
 async function publish() {
   notice('A publicar…');
-  const response = await fetch(`${apiBase}/publish`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: draft }) });
+  const response = await fetch(`${apiBase}/publish`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CMS-CSRF': csrfToken }, body: JSON.stringify({ content: draft }) });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || 'A publicação falhou.');
   notice(`Publicado com sucesso. Commit ${result.commit.slice(0, 7)}. O GitHub Pages pode demorar um momento a atualizar.`, 'success');
