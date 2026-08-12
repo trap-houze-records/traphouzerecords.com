@@ -905,6 +905,7 @@ footer p {
 .manager-copy { margin-top: 8px; text-align: center; }
 .manager-credential-actions { display: grid; gap: 8px; margin-top: 8px; }
 .manager-credential-actions .manager-copy { margin-top: 0; }
+.manager-security-note { margin: 12px 0 18px; color: rgba(255,255,255,.5); font-size: .75rem; line-height: 1.5; }
 .manager-whatsapp { width: 100%; border: 1px solid #c5ff5c; background: transparent; color: #c5ff5c; cursor: pointer; font: inherit; padding: 12px; }
 .manager-preview { width: 100%; border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff; cursor: pointer; font: inherit; padding: 12px; }
 .manager-items { display: grid; gap: 4px; }

@@ -86,7 +86,7 @@ function renderClients() {
   $('#adminTabs').hidden = true;
   $('#publishButton').hidden = true;
   $('#adminContent').innerHTML = '<div id="clientModuleRoot"></div>';
-  window.ClientAdminModule.mount($('#clientModuleRoot'), { apiBase, getToken: () => sessionToken, getCsrf: () => csrfToken, onError: error => notice(error.message, 'error') }).catch(error => notice(error.message, 'error'));
+  window.ClientAdminModule.mount($('#clientModuleRoot'), { apiBase, getToken: () => sessionToken, getCsrf: () => csrfToken, onError: error => notice(error.message, 'error'), onNotice: notice }).catch(error => notice(error.message, 'error'));
 }
 function selectModule(module) {
   activeModule = module;
