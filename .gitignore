@@ -2,3 +2,9 @@
 node_modules/
 worker/.wrangler/
 .wrangler/
+worker/wrangler.local.toml
+FUNCIONALIDADES.md
+REGRAS-DE-TRABALHO.md
+ESTADO-ONLINE.md
+AREA-CLIENTE-TESTES.md
+assets/js/client-config.js

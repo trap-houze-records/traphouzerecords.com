@@ -728,6 +728,134 @@ footer p {
 }
 .tidycal-embed { min-height: 680px; }
 
+/* ========== ÁREA DO CLIENTE ========== */
+.client-page { min-height: 100vh; background: #0a0a0a; color: #f7f7f7; }
+.client-shell { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 28px 0 72px; }
+.client-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 26px; border-bottom: 1px solid rgba(255,255,255,.13); }
+.client-brand { display: inline-flex; gap: 14px; align-items: center; color: #fff; font-size: .82rem; letter-spacing: .12em; text-decoration: none; text-transform: uppercase; }
+.client-brand img { width: 48px; height: 48px; object-fit: contain; }
+.client-user { display: flex; align-items: center; gap: 16px; color: rgba(255,255,255,.72); font-size: .9rem; }
+.client-signout, .client-link { border: 0; background: transparent; color: #fff; cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 4px; }
+.client-hero { padding: 70px 0 48px; }
+.client-hero-row { display: flex; justify-content: space-between; gap: 30px; align-items: flex-start; }
+.client-hero h1 { max-width: 780px; margin: 8px 0 14px; font-size: clamp(2.3rem, 5vw, 4.7rem); letter-spacing: -.035em; line-height: .98; text-transform: uppercase; }
+.client-hero p:not(.eyebrow) { max-width: 590px; color: rgba(255,255,255,.65); line-height: 1.6; }
+.client-status { flex: none; border: 1px solid #c5ff5c; color: #c5ff5c; padding: 9px 12px; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
+.client-progress { height: 7px; background: #282828; margin-top: 42px; overflow: hidden; }
+.client-progress span { display: block; height: 100%; background: #c5ff5c; }
+.client-progress-labels { display: flex; justify-content: space-between; color: rgba(255,255,255,.42); font-size: .72rem; letter-spacing: .08em; margin-top: 10px; text-transform: uppercase; }
+.client-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; }
+.client-card { border: 1px solid rgba(255,255,255,.13); background: #111; padding: 26px; }
+.client-card-title { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 24px; }
+.client-card-title h2, .client-support h2 { font-size: 1.08rem; letter-spacing: .07em; text-transform: uppercase; }
+.client-card-title > span { color: rgba(255,255,255,.45); font-size: .78rem; }
+.client-timeline ol { list-style: none; }
+.client-timeline li { position: relative; display: grid; grid-template-columns: 72px 1fr; gap: 15px; padding: 0 0 26px; }
+.client-timeline li:not(:last-child)::before { content: ''; position: absolute; top: 25px; bottom: 0; left: 83px; width: 1px; background: #333; }
+.client-timeline time { color: #c5ff5c; font-size: .76rem; letter-spacing: .08em; padding-top: 3px; }
+.client-timeline li.done time { color: rgba(255,255,255,.38); }
+.client-timeline strong, .client-file strong { display: block; font-weight: 600; }
+.client-timeline p, .client-file p { margin-top: 5px; color: rgba(255,255,255,.5); font-size: .86rem; }
+.client-files { display: grid; gap: 12px; }
+.client-file { display: grid; grid-template-columns: 42px 1fr auto; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,.09); padding-top: 14px; }
+.client-file-icon { width: 36px; height: 36px; display: grid; place-items: center; background: #242424; color: #c5ff5c; }
+.client-download { border: 1px solid rgba(255,255,255,.28); background: transparent; color: #fff; padding: 8px 10px; cursor: pointer; font-size: .76rem; }
+.client-download:disabled { color: rgba(255,255,255,.35); border-color: rgba(255,255,255,.12); cursor: default; }
+.client-messages { min-height: 300px; }
+.client-message-list { display: grid; gap: 18px; }
+.client-message-list article { border-top: 1px solid rgba(255,255,255,.09); padding-top: 14px; }
+.client-message-list article > div { display: flex; justify-content: space-between; gap: 15px; }
+.client-message-list time { color: rgba(255,255,255,.4); font-size: .75rem; }
+.client-message-list p, .client-support > p:not(.eyebrow) { margin-top: 8px; color: rgba(255,255,255,.62); line-height: 1.6; }
+.client-support { display: flex; flex-direction: column; min-height: 300px; background: #c5ff5c; color: #111; }
+.client-support .eyebrow, .client-support > p:not(.eyebrow) { color: rgba(0,0,0,.62); }
+.client-support h2 { margin-top: 8px; font-size: 1.8rem; }
+.client-contact { display: flex; justify-content: space-between; margin-top: auto; background: #111; color: #fff; padding: 15px; text-decoration: none; }
+.client-contact span { font-size: 1.3rem; }
+.client-demo { margin-top: 22px; color: rgba(255,255,255,.35); font-size: .78rem; text-align: center; }
+.client-simple-hero { padding: 72px 0 44px; }
+.client-simple-hero h1 { margin: 8px 0 14px; font-size: clamp(2.5rem, 5vw, 4.8rem); letter-spacing: -.04em; line-height: .95; text-transform: uppercase; }
+.client-simple-hero > p:not(.eyebrow) { color: rgba(255,255,255,.6); }
+.client-total-due { display: flex; justify-content: space-between; align-items: center; width: min(100%, 430px); margin-top: 28px; border: 1px solid #ffd06a; color: #ffd06a; padding: 14px; }
+.client-total-due strong { font-size: 1.2rem; }
+.track-list { display: grid; gap: 16px; }
+.track-card { border: 1px solid rgba(255,255,255,.14); background: #111; padding: 28px; }
+.track-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; }
+.track-heading h2 { font-size: clamp(1.6rem, 3vw, 2.5rem); letter-spacing: -.02em; text-transform: uppercase; }
+.track-stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 30px; background: #292929; }
+.track-stage { display: grid; grid-template-columns: 25px 1fr; align-items: center; gap: 9px; background: #171717; color: rgba(255,255,255,.38); padding: 15px; }
+.track-stage span { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: .67rem; }
+.track-stage strong { font-size: .82rem; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+.track-stage.complete { background: #202b10; color: #c5ff5c; }
+.track-stage.current { background: #c5ff5c; color: #111; }
+.track-payment { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.1); color: rgba(255,255,255,.7); font-size: .88rem; }
+.track-payment.pending { color: #ffd06a; }
+.track-payment button { border: 1px solid currentColor; background: transparent; color: inherit; padding: 8px 11px; cursor: pointer; font: inherit; font-size: .77rem; }
+.track-payment-mark { color: #c5ff5c; font-size: 1.2rem; }
+.client-simple-help { display: flex; justify-content: space-between; align-items: center; gap: 18px; border: 1px solid rgba(255,255,255,.14); margin-top: 16px; padding: 20px 25px; color: rgba(255,255,255,.62); }
+.client-simple-help a { color: #fff; text-decoration: none; }
+.client-simple-help b { color: #c5ff5c; font-size: 1.3rem; margin-left: 12px; }
+.booking-section { margin-top: 54px; }
+.booking-section-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 18px; }
+.booking-section-heading h2 { margin-top: 7px; font-size: 1.55rem; letter-spacing: .02em; text-transform: uppercase; }
+.booking-section-heading > span { color: rgba(255,255,255,.4); font-size: .78rem; }
+.booking-list { border-top: 1px solid rgba(255,255,255,.15); }
+.booking-row { display: grid; grid-template-columns: 92px 1fr auto; align-items: center; gap: 20px; border-bottom: 1px solid rgba(255,255,255,.12); padding: 20px 0; }
+.booking-row time { color: #c5ff5c; font-size: .76rem; letter-spacing: .07em; }
+.booking-row strong { display: block; font-size: 1rem; font-weight: 600; }
+.booking-row p { margin-top: 5px; color: rgba(255,255,255,.5); font-size: .86rem; }
+.booking-payment span { color: #c5ff5c; font-size: .82rem; }
+.booking-payment button { border: 1px solid #ffd06a; background: transparent; color: #ffd06a; padding: 8px 11px; cursor: pointer; font: inherit; font-size: .77rem; }
+.client-login-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 70% 20%, #222 0, #0a0a0a 42%); }
+.client-login-card { display: grid; gap: 42px; width: min(100%, 480px); border: 1px solid rgba(255,255,255,.15); background: rgba(17,17,17,.94); padding: 38px; }
+.client-login-card h1 { margin: 10px 0 14px; font-size: clamp(2.3rem, 7vw, 3.7rem); line-height: .95; letter-spacing: -.04em; text-transform: uppercase; }
+.client-login-card > div > p:not(.eyebrow) { color: rgba(255,255,255,.6); line-height: 1.6; }
+.client-login-form { display: grid; gap: 17px; }
+.client-login-form label { display: grid; gap: 7px; color: rgba(255,255,255,.7); font-size: .8rem; }
+.client-login-form input { width: 100%; border: 1px solid rgba(255,255,255,.22); background: #0a0a0a; color: #fff; padding: 13px; }
+.client-login-form button { display: flex; justify-content: space-between; align-items: center; border: 0; background: #c5ff5c; color: #111; padding: 14px; cursor: pointer; font: inherit; }
+.client-login-form button span { font-size: 1.3rem; }
+.client-login-form p { min-height: 18px; color: #ffd06a; font-size: .78rem; }
+.client-login-help { color: rgba(255,255,255,.48); font-size: .82rem; }
+.client-login-help a { color: #fff; }
+.manager-shell { max-width: 1200px; }
+.manager-local { color: #c5ff5c; font-size: .76rem; letter-spacing: .08em; text-transform: uppercase; }
+.manager-hero { padding: 58px 0 38px; }
+.manager-hero h1 { margin: 8px 0 12px; font-size: clamp(2.5rem, 5vw, 4.8rem); letter-spacing: -.04em; line-height: .95; text-transform: uppercase; }
+.manager-hero > p:not(.eyebrow) { color: rgba(255,255,255,.6); }
+.manager-backup { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.manager-backup button, .manager-backup label { border: 1px solid rgba(255,255,255,.28); background: transparent; color: #fff; cursor: pointer; font: inherit; font-size: .78rem; padding: 10px 12px; }
+.manager-layout { display: grid; grid-template-columns: 240px 1fr; gap: 38px; }
+.manager-sidebar { border-right: 1px solid rgba(255,255,255,.14); padding-right: 22px; }
+.manager-add, .manager-copy { width: 100%; border: 0; background: #c5ff5c; color: #111; cursor: pointer; font: inherit; padding: 12px; text-align: left; }
+.manager-client-list { display: grid; gap: 4px; margin-top: 16px; }
+.manager-client-list button { display: grid; gap: 4px; border: 0; background: transparent; color: rgba(255,255,255,.56); cursor: pointer; padding: 13px 10px; text-align: left; }
+.manager-client-list button.active { background: #202020; color: #fff; }
+.manager-client-list span { font-size: .78rem; }
+.manager-content-heading, .manager-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.manager-content-heading { margin-bottom: 24px; }
+.manager-content-heading h2 { margin-top: 6px; font-size: 2rem; text-transform: uppercase; }
+.manager-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.manager-grid .client-card:first-child { grid-row: span 2; }
+.manager-grid h3 { margin-bottom: 20px; font-size: 1rem; letter-spacing: .06em; text-transform: uppercase; }
+.manager-password { display: grid; grid-template-columns: 1fr auto; }
+.manager-password button { border: 1px solid rgba(255,255,255,.2); border-left: 0; background: #242424; color: #fff; cursor: pointer; padding: 0 10px; font-size: .76rem; }
+.manager-copy { margin-top: 8px; text-align: center; }
+.manager-credential-actions { display: grid; gap: 8px; margin-top: 8px; }
+.manager-credential-actions .manager-copy { margin-top: 0; }
+.manager-whatsapp { width: 100%; border: 1px solid #c5ff5c; background: transparent; color: #c5ff5c; cursor: pointer; font: inherit; padding: 12px; }
+.manager-preview { width: 100%; border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff; cursor: pointer; font: inherit; padding: 12px; }
+.manager-items { display: grid; gap: 4px; }
+.manager-records { display: grid; gap: 14px; }
+.manager-record { border-top: 1px solid rgba(255,255,255,.1); padding-top: 15px; }
+.manager-record-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.manager-record-top button { border: 0; background: transparent; color: rgba(255,255,255,.6); cursor: pointer; font-size: 1.3rem; }
+.manager-record-grid { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: end; }
+.manager-item { display: flex; align-items: start; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.1); }
+.manager-item p { margin-top: 5px; color: rgba(255,255,255,.58); font-size: .8rem; }
+.manager-item button { border: 0; background: transparent; color: rgba(255,255,255,.6); cursor: pointer; font-size: 1.3rem; }
+.manager-paid { color: #c5ff5c; }.manager-pending { color: #ffd06a; }
+
 .close-btn {
     position: absolute;
     top: 10px;
@@ -758,6 +886,29 @@ footer p {
     .admin-topbar { align-items: flex-start; }
     .admin-topbar > div { align-items: flex-end; flex-direction: column; }
     .admin-grid, .admin-row { grid-template-columns: 1fr; }
+    .client-shell { width: min(100% - 28px, 1180px); padding-top: 18px; }
+    .client-header, .client-hero-row { align-items: flex-start; }
+    .client-header { gap: 18px; }
+    .client-brand span, .client-user span { display: none; }
+    .client-hero { padding: 46px 0 34px; }
+    .client-hero-row { flex-direction: column; }
+    .client-hero h1 { font-size: clamp(2.2rem, 13vw, 3.8rem); }
+    .client-status { order: -1; }
+    .client-progress-labels { font-size: .61rem; }
+    .client-grid { grid-template-columns: 1fr; }
+    .client-card { padding: 20px; }
+    .client-file { grid-template-columns: 38px 1fr; }
+    .client-download { grid-column: 2; justify-self: start; }
+    .client-simple-hero { padding: 48px 0 32px; }
+    .track-card { padding: 20px; }
+    .track-stages { grid-template-columns: 1fr; }
+    .client-simple-help { align-items: flex-start; flex-direction: column; }
+    .booking-row { grid-template-columns: 70px 1fr; gap: 14px; }
+    .booking-payment { grid-column: 2; }
+    .client-login-card { padding: 28px 22px; gap: 34px; }
+    .manager-layout, .manager-grid { grid-template-columns: 1fr; }
+    .manager-sidebar { border-right: 0; border-bottom: 1px solid rgba(255,255,255,.14); padding: 0 0 22px; }
+    .manager-grid .client-card:first-child { grid-row: auto; }
     nav {
         padding: 15px 20px;
     }

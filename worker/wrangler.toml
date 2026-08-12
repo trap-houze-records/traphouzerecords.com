@@ -14,6 +14,11 @@ ALLOWED_GITHUB_USERS = "trap-houze-records"
 # ID da instalação da GitHub App neste repositório.
 GITHUB_INSTALLATION_ID = "153174915"
 
+[[d1_databases]]
+binding = "CLIENT_PORTAL_DB"
+database_name = "trap-houze-client-portal"
+database_id = "aa038bcd-3a07-48d6-8e84-d3352b1ef121"
+
 # Criar como secrets no Cloudflare, nunca neste ficheiro:
 # GITHUB_OAUTH_CLIENT_ID
 # GITHUB_OAUTH_CLIENT_SECRET
