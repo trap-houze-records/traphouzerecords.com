@@ -13,9 +13,9 @@ function renderHero() {
 }
 
 function renderServices() {
-  const services = content.services.filter(service => service.visible);
+  const services = content.services.map((service, index) => ({ service, index })).filter(({ service }) => service.visible);
   if (!sectionVisible('services') || !services.length) return '';
-  return `<section id="services" class="services"><h2 class="section-title">Serviços</h2><div class="service-grid">${services.map((service, index) => `
+  return `<section id="services" class="services"><h2 class="section-title">Serviços</h2><div class="service-grid">${services.map(({ service, index }) => `
     <article class="service-card"><div><div class="service-icon">${escapeHtml(service.icon)}</div><h3>${escapeHtml(service.title)}</h3><p>${escapeHtml(service.description)}</p></div>
     <button class="btn" data-service="${index}">${service.action === 'whatsapp' ? 'Contactar' : 'Reservar'}</button></article>`).join('')}</div></section>`;
 }
@@ -57,12 +57,10 @@ function showEquipment(index) {
   document.getElementById('modal').classList.add('active');
 }
 function openBooking(service) {
-  const popup = document.getElementById('bookingPopup');
-  document.getElementById('popupServiceTitle').textContent = `Agendar ${service.title}`;
-  const link = document.getElementById('bookingLink');
-  link.href = service.action === 'whatsapp' ? `https://wa.me/${content.site.whatsapp}?text=${encodeURIComponent(`Olá Trap Houze! Quero marcar ${service.title}.`)}` : content.site.bookingUrl;
-  link.textContent = service.action === 'whatsapp' ? 'Abrir WhatsApp' : 'Abrir agenda';
-  popup.classList.add('active');
+  const url = service.action === 'whatsapp'
+    ? `https://wa.me/${content.site.whatsapp}?text=${encodeURIComponent(`Olá Trap Houze! Quero marcar ${service.title}.`)}`
+    : content.site.bookingUrl;
+  window.open(url, '_blank', 'noopener');
 }
 function closeOverlays() { document.querySelectorAll('.modal.active, .popup-overlay.active').forEach(element => element.classList.remove('active')); }
 
