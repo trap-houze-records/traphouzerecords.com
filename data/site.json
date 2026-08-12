@@ -24,7 +24,7 @@
     {
       "id": "equipment",
       "label": "Equipamento",
-      "visible": false
+      "visible": true
     },
     {
       "id": "about",
