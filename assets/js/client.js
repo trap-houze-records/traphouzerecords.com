@@ -12,6 +12,7 @@ const defaultClientData = {
 };
 let clientData = defaultClientData;
 const apiBase = (window.CLIENT_PORTAL_API_URL || window.CMS_API_URL || '').replace(/\/$/, '');
+const usesLocalPortalApi = /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(apiBase);
 let apiToken = sessionStorage.getItem('th_client_portal_token') || '';
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
@@ -76,7 +77,12 @@ function renderLogin(message = '') {
         sessionStorage.setItem('th_client_portal_token', apiToken);
         clientData = normalisePortal(result.portal);
         renderPortal();
-      }).catch(caught => renderLogin(caught.message));
+      }).catch(caught => {
+        const message = usesLocalPortalApi && caught.message === 'Credenciais inválidas.'
+          ? 'Estás na versão local. Esta usa uma base de dados separada da versão online; cria aqui um cliente de teste ou entra em traphouzerecords.com/client.html.'
+          : caught.message;
+        renderLogin(message);
+      });
       return;
     }
     const client = loadClients().find(item => item.username.toLowerCase() === username && item.password === form.get('password'));

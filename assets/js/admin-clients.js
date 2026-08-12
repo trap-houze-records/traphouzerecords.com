@@ -85,7 +85,13 @@ window.ClientAdminModule = (() => {
       if (selected) return refresh(selected.dataset.client).catch(options.onError);
       if (event.target.closest('[data-new-client]')) {
         const password = generatePassword();
-        return api('/client/admin/clients', { method: 'POST', body: JSON.stringify({ name: 'Novo cliente', username: `cliente-${Date.now()}`, password }) }).then(result => { revealedPasswords.set(result.id, password); return refresh(result.id); }).catch(options.onError);
+        return api('/client/admin/clients', { method: 'POST', body: JSON.stringify({ name: 'Novo cliente', username: `cliente-${Date.now()}`, password }) }).then(result => {
+          const clientId = result.client?.id;
+          if (!clientId) throw new Error('A conta foi criada, mas não foi possível selecioná-la. Atualize a página e defina uma nova palavra-passe.');
+          revealedPasswords.set(clientId, password);
+          options.onNotice?.('Cliente criado. Copie agora a palavra-passe apresentada e guarde-a antes de sair desta página.', 'success');
+          return refresh(clientId);
+        }).catch(options.onError);
       }
       if (event.target.closest('[data-generate-password]')) {
         const input = root.querySelector('[data-client-field="password"]');
