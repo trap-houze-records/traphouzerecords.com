@@ -142,6 +142,17 @@
       }
     ]
   },
-  "artists": [],
+  "artists": [
+    {
+      "name": "J-Dot",
+      "genre": "Artista",
+      "image": ""
+    },
+    {
+      "name": "Novo artista",
+      "genre": "",
+      "image": ""
+    }
+  ],
   "reviews": []
 }
