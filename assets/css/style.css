@@ -345,6 +345,18 @@ nav a:hover {
     color: #888;
 }
 
+.nav-login {
+    border: 1px solid #16c7f3;
+    color: #16c7f3;
+    font-size: 0.75rem;
+    padding: 9px 13px;
+}
+
+.nav-login:hover {
+    background: #16c7f3;
+    color: #101010;
+}
+
 /* ========== HERO SLIDER ========== */
 .hero-slider {
     position: relative;
@@ -1268,6 +1280,11 @@ footer p {
 
     nav a {
         font-size: 0.75rem;
+    }
+
+    .nav-login {
+        font-size: .68rem;
+        padding: 7px 9px;
     }
 
     .logo-text {

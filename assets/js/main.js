@@ -61,6 +61,17 @@ function renderSite() {
   document.getElementById('site').innerHTML = `<nav><a href="#home" aria-label="Início"><img src="images/Logo.png" alt="${escapeHtml(content.site.name)}" class="nav-logo"></a><ul>${visibleNav().map(item => `<li><a href="#${escapeHtml(item.id)}">${escapeHtml(item.label)}</a></li>`).join('')}</ul></nav>${renderHero()}${renderServices()}${renderEquipment()}${renderAbout()}${renderArtists()}${renderReviews()}<footer><p>© ${new Date().getFullYear()} ${escapeHtml(content.site.name)}</p><p>${escapeHtml(content.site.location)}</p></footer><button class="help-button" aria-label="Contactos">?</button><div id="helpPopup" class="help-popup"><div class="help-popup-header"><h4>Contactos</h4><button class="close-help" aria-label="Fechar">×</button></div><div class="help-content"><a href="mailto:${escapeHtml(content.site.email)}">${escapeHtml(content.site.email)}</a><a href="${escapeHtml(content.site.instagram)}" target="_blank" rel="noopener">${escapeHtml(content.site.instagramHandle)}</a><a href="https://wa.me/${escapeHtml(content.site.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a><p>${escapeHtml(content.site.hours)}</p></div></div>${renderModal()}${renderArtistModal()}${renderBooking()}`;
 }
 
+function addArtistLogin() {
+  const navigation = document.querySelector('nav');
+  if (!navigation || navigation.querySelector('.nav-login')) return;
+  const login = document.createElement('a');
+  login.className = 'nav-login';
+  login.href = 'zona-do-artista/';
+  login.textContent = 'Login';
+  login.setAttribute('aria-label', 'Entrar na Zona do Artista');
+  navigation.append(login);
+}
+
 function showEquipment(index) {
   const item = content.equipment[index];
   document.getElementById('modalTitle').textContent = item.title;
@@ -108,6 +119,7 @@ function closeOverlays() {
 }
 
 function bindEvents() {
+  addArtistLogin();
   document.addEventListener('click', event => {
     const service = event.target.closest('[data-service]');
     const equipment = event.target.closest('[data-equipment]');
