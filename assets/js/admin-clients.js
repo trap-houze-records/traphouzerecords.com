@@ -46,7 +46,7 @@ window.ClientAdminModule = (() => {
         ${track ? `<label class="admin-field"><span>Fase</span><select data-field="stage">${[['start', 'Iniciar'], ['mix', 'Mix'], ['master', 'Master']].map(([value, text]) => `<option value="${value}" ${item.stage === value ? 'selected' : ''}>${text}</option>`).join('')}</select></label>` : `<label class="admin-field"><span>Data e hora</span><input type="datetime-local" data-field="startsAt" value="${escapeHtml((item.startsAt || '').replace(' ', 'T').slice(0, 16))}"></label>`}
         <label class="admin-field"><span>Valor (€)</span><input type="number" step="0.01" min="0" data-field="amount" value="${money(item.amountCents)}"></label>
        <label class="admin-field"><span>Link de pagamento</span><input type="url" data-field="paymentUrl" value="${escapeHtml(item.paymentUrl || '')}" placeholder="https://"></label>
-        ${track ? `<label class="admin-field"><span>Player Samply</span><input type="url" data-field="samplyUrl" value="${escapeHtml(item.samplyUrl || '')}" placeholder="https://samply.app/embed/..."><small>Cola o link de Embed do Samply para permitir ouvir e trocar versões.</small></label>` : ''}
+        ${track ? `<label class="admin-field"><span>Player Samply</span><textarea rows="3" data-field="samplyUrl" placeholder="<iframe src=&quot;https://samply.app/embed/...&quot; ...></iframe>">${escapeHtml(item.samplyUrl || '')}</textarea><small>Cola aqui o código Embed copiado do Samply. Guardamos automaticamente o link seguro do player.</small></label>` : ''}
        <label class="admin-check"><input type="checkbox" data-field="paymentStatus" ${item.paymentStatus === 'paid' ? 'checked' : ''}><span>Pagamento confirmado</span></label>
       </article>`;
     }
@@ -77,7 +77,9 @@ window.ClientAdminModule = (() => {
       const type = card.dataset.item;
       const field = name => card.querySelector(`[data-field="${name}"]`);
       const base = { amount: Number(field('amount').value || 0), paymentUrl: field('paymentUrl').value.trim(), paymentStatus: field('paymentStatus').checked ? 'paid' : 'pending' };
-      return type === 'tracks' ? { ...base, title: field('title').value.trim(), stage: field('stage').value, samplyUrl: field('samplyUrl').value.trim() } : { ...base, service: field('service').value.trim(), startsAt: field('startsAt').value.replace('T', ' ') };
+      const samplyValue = track ? field('samplyUrl').value.trim() : '';
+      const embedSource = samplyValue.match(/<iframe[^>]+src=['"]([^'"]+)['"]/i)?.[1] || samplyValue;
+      return type === 'tracks' ? { ...base, title: field('title').value.trim(), stage: field('stage').value, samplyUrl: embedSource } : { ...base, service: field('service').value.trim(), startsAt: field('startsAt').value.replace('T', ' ') };
     }
 
     root.addEventListener('click', event => {

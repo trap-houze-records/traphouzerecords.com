@@ -305,7 +305,9 @@ function paymentUrl(value) {
 function samplyPlayerUrl(value) {
   if (!value) return null;
   try {
-    const url = new URL(value);
+    const raw = String(value).trim();
+    const source = raw.match(/<iframe[^>]+src=['"]([^'"]+)['"]/i)?.[1] || raw;
+    const url = new URL(source);
     if (url.protocol !== 'https:' || !['samply.app', 'www.samply.app'].includes(url.hostname) || !/^\/embed\/[A-Za-z0-9_-]+\/?$/.test(url.pathname)) throw new Error();
     return url.toString();
   } catch { throw inputError('Use o link de embed do Samply (https://samply.app/embed/…).'); }
