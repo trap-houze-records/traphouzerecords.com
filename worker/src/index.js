@@ -489,8 +489,9 @@ async function publicBooking(request, env) {
     statements.push(db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), sessionClient.id, `client:${sessionClient.id}`, 'booking.requested', JSON.stringify({ appointmentId: id, duration })));
   }
   await db.batch(statements);
-  googleSyncAppointment(env, db, { id, ...appointment }).catch(caught => console.warn('Google Calendar: reserva criada sem espelho', caught));
-  return jsonResponse({ id, startsAt, endsAt, status: 'pending', client: sessionClient ? { name: sessionClient.name } : null }, 201);
+  let googleSynced = true;
+  try { await googleSyncAppointment(env, db, { id, ...appointment }); } catch (caught) { console.warn('Google Calendar: reserva criada sem espelho', caught); googleSynced = false; }
+  return jsonResponse({ id, startsAt, endsAt, status: 'pending', googleSynced, client: sessionClient ? { name: sessionClient.name } : null }, 201);
 }
 async function studioSchedule(request, env, appointmentId = '') {
   const admin = request.method === 'GET' ? await adminSession(request, env) : await requirePortalAdmin(request, env);
@@ -501,6 +502,11 @@ async function studioSchedule(request, env, appointmentId = '') {
     const from = appointmentDate(url.searchParams.get('from') || new Date().toISOString(), 'Data inicial');
     const until = appointmentDate(url.searchParams.get('until') || new Date(Date.now() + 1000 * 60 * 60 * 24 * 31).toISOString(), 'Data final');
     const appointments = await db.prepare("SELECT a.id, a.client_id AS clientId, COALESCE(c.display_name, a.guest_name) AS clientName, COALESCE(c.phone, a.guest_phone) AS clientPhone, a.service, a.starts_at AS startsAt, a.ends_at AS endsAt, a.status, a.notes, a.google_event_id AS googleEventId, 'studio' AS source FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id WHERE a.starts_at < ? AND a.ends_at > ? ORDER BY a.starts_at ASC").bind(until, from).all();
+    for (const appointment of appointments.results) {
+      if (!appointment.googleEventId && appointment.status !== 'cancelled') {
+        try { appointment.googleEventId = await googleSyncAppointment(env, db, appointment); } catch (caught) { console.warn('Google Calendar: não foi possível sincronizar marcação existente', caught); }
+      }
+    }
     const linkedGoogleIds = new Set(appointments.results.map(item => item.googleEventId).filter(Boolean));
     const external = (await googleBusyEvents(env, from, until)).filter(item => !linkedGoogleIds.has(item.id)).map(item => ({ id: `google:${item.id}`, clientId: '', clientName: 'Google Calendar', clientPhone: '', service: item.title, startsAt: item.startsAt, endsAt: item.endsAt, status: 'confirmed', notes: 'Evento externo — gerido no Google Calendar.', googleEventId: item.id, source: 'google', readOnly: true }));
     return jsonResponse({ appointments: [...appointments.results, ...external].sort((a, b) => a.startsAt.localeCompare(b.startsAt)) });
@@ -526,9 +532,12 @@ async function studioSchedule(request, env, appointmentId = '') {
   }
   const currentGoogle = appointmentId ? await db.prepare('SELECT google_event_id AS googleEventId FROM studio_appointments WHERE id = ?').bind(id).first() : null;
   const synced = { id, ...appointment, googleEventId: currentGoogle?.googleEventId || '' };
+  let googleSynced = true;
   if (appointment.status === 'cancelled') await googleDeleteAppointment(env, synced);
-  else googleSyncAppointment(env, db, synced).catch(caught => console.warn('Google Calendar: marcação guardada sem espelho', caught));
-  return jsonResponse(synced, appointmentId ? 200 : 201);
+  else {
+    try { synced.googleEventId = await googleSyncAppointment(env, db, synced); } catch (caught) { console.warn('Google Calendar: marcação guardada sem espelho', caught); googleSynced = false; }
+  }
+  return jsonResponse({ ...synced, googleSynced }, appointmentId ? 200 : 201);
 }
 async function portalAdminMutation(request, env, resource, id) {
   const admin = await requirePortalAdmin(request, env);
