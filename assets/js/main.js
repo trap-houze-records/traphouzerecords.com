@@ -78,14 +78,19 @@ function openBooking(service) {
 function showArtist(index) {
   const artist = content.artists[index];
   const links = Array.isArray(artist.links) ? artist.links : [];
+  const platformProperties = { Instagram: 'instagram', YouTube: 'youtube', Spotify: 'spotify', 'Apple Music': 'appleMusic' };
   const platformLinks = artistPlatforms.map(([label, icon]) => {
-    const link = links.find(item => String(item.label || '').trim().toLowerCase() === label.toLowerCase());
-    const url = safeUrl(link?.url);
+    const legacy = links.find(item => String(item.label || '').trim().toLowerCase() === label.toLowerCase());
+    const url = safeUrl(artist[platformProperties[label]] || legacy?.url);
     return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" aria-label="${label} de ${escapeHtml(artist.name)}"><img src="https://cdn.simpleicons.org/${icon}/ffffff" alt="">${label}<span>↗</span></a>` : `<span class="artist-platform-disabled" aria-label="${label} ainda não disponível"><img src="https://cdn.simpleicons.org/${icon}/777777" alt="">${label}</span>`;
   }).join('');
-  const catalog = Array.isArray(artist.catalog) ? artist.catalog : [];
+  const legacyPlaylist = (artist.catalog || []).find(item => spotifyPlaylistEmbed(item.url));
+  const playlist = spotifyPlaylistEmbed(artist.spotifyPlaylist || legacyPlaylist?.url);
+  const catalogMarkup = playlist
+    ? `<article class="artist-catalog-playlist"><div><strong>Playlist Spotify</strong><small>Catálogo Trap Houze · ${escapeHtml(artist.name)}</small></div><iframe src="${escapeHtml(playlist)}" title="Playlist Spotify: ${escapeHtml(artist.name)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></article>`
+    : '<p>A playlist Spotify deste artista será disponibilizada em breve.</p>';
   document.getElementById('artistModalTitle').textContent = artist.name;
-  document.getElementById('artistModalBody').innerHTML = `<div class="artist-modal-profile"><img class="artist-modal-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div><p class="artist-modal-genre">${escapeHtml(artist.genre || 'Artista Trap Houze Records')}</p><p class="artist-modal-bio">${escapeHtml(artist.bio || 'Perfil em atualização.')}</p></div></div><section class="artist-modal-section"><h4>Ouvir e seguir</h4><div class="artist-links">${platformLinks}</div></section><section class="artist-modal-section"><h4>Catálogo Trap Houze</h4><div class="artist-catalog">${catalog.map(item => { const embed = spotifyPlaylistEmbed(item.url); return embed ? `<article class="artist-catalog-playlist"><div><strong>${escapeHtml(item.title || 'Playlist Spotify')}</strong><small>${escapeHtml(item.type || 'Playlist Spotify')}</small></div><iframe src="${escapeHtml(embed)}" title="Playlist Spotify: ${escapeHtml(item.title || artist.name)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></article>` : `<article><div><strong>${escapeHtml(item.title || 'Lançamento')}</strong><small>${escapeHtml(item.type || 'Projeto Trap Houze')}</small></div>${safeUrl(item.url) ? `<a href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noopener">Ouvir ↗</a>` : '<span>Em breve</span>'}</article>`; }).join('') || '<p>Ainda não existem lançamentos publicados no catálogo Trap Houze.</p>'}</div></section>`;
+  document.getElementById('artistModalBody').innerHTML = `<div class="artist-modal-profile"><img class="artist-modal-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div><p class="artist-modal-genre">${escapeHtml(artist.genre || 'Artista Trap Houze Records')}</p><p class="artist-modal-bio">${escapeHtml(artist.bio || 'Perfil em atualização.')}</p></div></div><section class="artist-modal-section"><h4>Ouvir e seguir</h4><div class="artist-links">${platformLinks}</div></section><section class="artist-modal-section"><h4>Catálogo Trap Houze</h4><div class="artist-catalog">${catalogMarkup}</div></section>`;
   const modal = document.getElementById('artistModal');
   modal.classList.add('active'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
 }
