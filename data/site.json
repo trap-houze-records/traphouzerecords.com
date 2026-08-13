@@ -96,6 +96,26 @@
       "visible": true
     }
   ],
+  "bookingServices": [
+    {
+      "id": "studio-engineer",
+      "title": "Sessão de Estúdio (Captação com engenheiro)",
+      "pricePerHour": 20,
+      "active": true
+    },
+    {
+      "id": "studio-art-direction",
+      "title": "Sessão de Estúdio (Captação com engenheiro + Direção Artística)",
+      "pricePerHour": 30,
+      "active": true
+    },
+    {
+      "id": "studio-rental",
+      "title": "Alugar o Estúdio",
+      "pricePerHour": 10,
+      "active": true
+    }
+  ],
   "equipment": [
     {
       "id": "midi",

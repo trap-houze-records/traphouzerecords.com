@@ -97,6 +97,21 @@ async function contentFromGitHub(env) {
 function validContent(content) {
   return content && typeof content === 'object' && content.site && Array.isArray(content.navigation) && Array.isArray(content.hero) && Array.isArray(content.services) && Array.isArray(content.equipment);
 }
+const defaultBookingServices = [
+  { id: 'studio-engineer', title: 'Sessão de Estúdio (Captação com engenheiro)', pricePerHour: 20, active: true },
+  { id: 'studio-art-direction', title: 'Sessão de Estúdio (Captação com engenheiro + Direção Artística)', pricePerHour: 30, active: true },
+  { id: 'studio-rental', title: 'Alugar o Estúdio', pricePerHour: 10, active: true }
+];
+function bookingServicesFromContent(content) {
+  const source = Array.isArray(content?.bookingServices) && content.bookingServices.length ? content.bookingServices : defaultBookingServices;
+  return source.map((item, index) => ({ id: String(item.id || `service-${index + 1}`), title: String(item.title || '').trim(), pricePerHour: Math.max(0, Number(item.pricePerHour || 0)), active: item.active !== false })).filter(item => item.title);
+}
+async function configuredBookingService(env, id) {
+  const services = bookingServicesFromContent((await contentFromGitHub(env)).content);
+  const service = services.find(item => item.id === String(id || ''));
+  if (!service || !service.active) throw inputError('Este tipo de reserva não está disponível.');
+  return service;
+}
 
 async function login(request, env) {
   // Apenas no Worker local: permite validar a interface sem copiar segredos OAuth.
@@ -561,7 +576,8 @@ async function publicBooking(request, env) {
   const sessionClient = session ? await db.prepare('SELECT id, display_name AS name, phone FROM clients WHERE id = ? AND active = 1').bind(session.clientId).first() : null;
   const guestName = String(body.name || '').trim();
   const guestPhone = String(body.phone || '').replace(/\D/g, '');
-  const service = String(body.service || 'Sessão de estúdio').trim().slice(0, 160);
+  const bookingService = await configuredBookingService(env, body.serviceId);
+  const service = bookingService.title;
   const notes = String(body.notes || '').trim().slice(0, 2000) || null;
   if (!sessionClient && (!guestName || !/^\d{9,15}$/.test(guestPhone))) return error('Indique o nome e um WhatsApp válido.');
   const appointment = { clientId: sessionClient?.id || null, guestName: sessionClient ? null : guestName, guestPhone: sessionClient ? null : guestPhone, service, startsAt, endsAt, status: 'pending', notes };
@@ -569,7 +585,7 @@ async function publicBooking(request, env) {
   const id = randomId();
   const statements = [db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, service, starts_at, ends_at, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes)];
   if (sessionClient) {
-    statements.push(db.prepare("INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, 'pending', 0, NULL)").bind(randomId(), sessionClient.id, service, startsAt));
+    statements.push(db.prepare("INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, 'pending', ?, NULL)").bind(randomId(), sessionClient.id, service, startsAt, Math.round(bookingService.pricePerHour * duration * 100)));
     statements.push(db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), sessionClient.id, `client:${sessionClient.id}`, 'booking.requested', JSON.stringify({ appointmentId: id, duration })));
   }
   await db.batch(statements);
@@ -613,6 +629,10 @@ async function studioSchedule(request, env, appointmentId = '') {
     await db.prepare('UPDATE studio_appointments SET client_id = ?, guest_name = ?, guest_phone = ?, service = ?, starts_at = ?, ends_at = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes, id).run();
   } else {
     await db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, service, starts_at, ends_at, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes).run();
+    const pricedService = bookingServicesFromContent((await contentFromGitHub(env)).content).find(item => item.title === appointment.service);
+    const hours = Math.max(0, (new Date(`${appointment.endsAt.replace(' ', 'T')}Z`) - new Date(`${appointment.startsAt.replace(' ', 'T')}Z`)) / 3600000);
+    const amountCents = pricedService ? Math.round(pricedService.pricePerHour * hours * 100) : cents(body.amount || 0);
+    if (appointment.clientId) await db.prepare("INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, 'pending', ?, NULL)").bind(randomId(), appointment.clientId, appointment.service, appointment.startsAt, amountCents).run();
   }
   const currentGoogle = appointmentId ? await db.prepare('SELECT google_event_id AS googleEventId FROM studio_appointments WHERE id = ?').bind(id).first() : null;
   const synced = { id, ...appointment, googleEventId: currentGoogle?.googleEventId || '' };

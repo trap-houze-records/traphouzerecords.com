@@ -194,6 +194,10 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .booking-panel-head span { color: rgba(255,255,255,.56); font-size: .78rem; }
 .booking-panel-head > span { color: #16c7f3; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
 .booking-duration { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.1); padding: 16px 24px; }
+.booking-service-control { align-items: end; gap: 22px; }
+.booking-service-control label, .booking-service-control > div { display: grid; gap: 6px; }
+.booking-service-control select { border: 1px solid rgba(22,199,243,.45); background: #111; color: #fff; font: inherit; font-size: .8rem; max-width: 410px; padding: 9px 10px; }
+.booking-service-control > div { border-left: 1px solid rgba(255,255,255,.12); padding-left: 18px; }
 .booking-duration > span { color: rgba(255,255,255,.58); font-size: .75rem; margin-right: 6px; text-transform: uppercase; letter-spacing: .08em; }
 .booking-duration strong { color: #16c7f3; font-size: .82rem; font-weight: 500; }
 .booking-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .8fr); }
@@ -229,6 +233,7 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .booking-portal-link { display: inline-block; color: #101010; background: #16c7f3; margin: 22px 0 0; padding: 12px 15px; text-decoration: none; font-size: .8rem; }
 .booking-details { min-height: 500px; }
 .booking-summary button { width: max-content; border: 0; background: transparent; color: #16c7f3; cursor: pointer; font: inherit; font-size: .76rem; padding: 6px 0 0; }
+.booking-summary small { color: rgba(255,255,255,.58); font-size: .76rem; line-height: 1.45; }
 .booking-details form { display: grid; gap: 14px; margin-top: 25px; }
 .booking-details label { display: grid; gap: 6px; color: rgba(255,255,255,.62); font-size: .76rem; }
 .booking-details input, .booking-details textarea { width: 100%; border: 1px solid rgba(255,255,255,.18); background: #111; color: #fff; font: inherit; padding: 11px; }
