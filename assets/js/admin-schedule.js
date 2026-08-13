@@ -7,16 +7,19 @@ window.StudioScheduleModule = (() => {
     const date = new Date(normalized);
     return Number.isNaN(date.getTime()) ? null : date;
   };
-  const dayKey = date => date.toISOString().slice(0, 10);
+  const scheduleParts = value => {
+    const match = String(value || '').trim().match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+    return match ? { date: match[1], time: match[2] } : null;
+  };
+  const dayKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   const inputDate = value => value ? String(value).replace(' ', 'T').slice(0, 16) : '';
   const displayDate = value => {
-    const date = asScheduleDate(value);
-    return date ? new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }).format(date) : 'Data por confirmar';
+    const parts = scheduleParts(value);
+    if (!parts) return 'Data por confirmar';
+    return new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(`${parts.date}T12:00:00Z`));
   };
-  const displayTime = value => {
-    const date = asScheduleDate(value);
-    return date ? new Intl.DateTimeFormat('pt-PT', { hour: '2-digit', minute: '2-digit', hour12: false }).format(date) : '—';
-  };
+  // Os horários são guardados como hora local de Lisboa. Nunca converter para UTC aqui.
+  const displayTime = value => scheduleParts(value)?.time || '—';
   const monday = value => { const date = new Date(value); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - ((date.getDay() + 6) % 7)); return date; };
   const shiftDays = (date, amount) => { const next = new Date(date); next.setDate(next.getDate() + amount); return next; };
   const localInput = date => { const offset = date.getTimezoneOffset(); return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16); };
