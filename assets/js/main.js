@@ -2,6 +2,7 @@ let content;
 let activeSlide = 0;
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
+const safeUrl = value => { try { const url = new URL(String(value || '')); return ['https:', 'http:'].includes(url.protocol) ? url.toString() : ''; } catch { return ''; } };
 const visibleNav = () => content.navigation.filter(item => item.visible);
 const sectionVisible = id => visibleNav().some(item => item.id === id);
 
@@ -34,7 +35,7 @@ function renderAbout() {
 
 function renderArtists() {
   if (!sectionVisible('artists') || !content.artists.length) return '';
-  return `<section id="artists" class="artists"><h2 class="section-title">Artistas</h2><div class="artists-grid">${content.artists.map(artist => `<article class="artist-item">${artist.image ? `<img class="artist-item-image" src="${escapeHtml(artist.image)}" alt="${escapeHtml(artist.name)}">` : '<div class="artist-item-image">FOTO</div>'}<div class="artist-item-name"><h4>${escapeHtml(artist.name)}</h4><p>${escapeHtml(artist.genre)}</p></div></article>`).join('')}</div></section>`;
+  return `<section id="artists" class="artists"><h2 class="section-title">Artistas</h2><div class="artists-grid">${content.artists.map((artist, index) => `<button type="button" class="artist-item" data-artist="${index}" aria-label="Ver perfil de ${escapeHtml(artist.name)}"><img class="artist-item-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div class="artist-item-name"><h4>${escapeHtml(artist.name)}</h4><p>${escapeHtml(artist.genre)}</p><span>Ver perfil →</span></div></button>`).join('')}</div></section>`;
 }
 
 function renderReviews() {
@@ -43,10 +44,11 @@ function renderReviews() {
 }
 
 function renderModal() { return `<div id="modal" class="modal"><div class="modal-content"><div class="modal-header"><h3 id="modalTitle"></h3><button class="close-modal" aria-label="Fechar">×</button></div><div class="modal-body"><div id="modalGallery" class="equipment-gallery"></div><p id="modalDescription" class="equipment-description"></p></div></div></div>`; }
+function renderArtistModal() { return `<div id="artistModal" class="modal artist-modal" aria-hidden="true"><article class="modal-content artist-modal-content" role="dialog" aria-modal="true" aria-labelledby="artistModalTitle"><header class="modal-header"><div><p class="eyebrow">Trap Houze Records</p><h3 id="artistModalTitle"></h3></div><button class="close-modal" aria-label="Fechar perfil do artista">×</button></header><div id="artistModalBody" class="artist-modal-body"></div></article></div>`; }
 function renderBooking() { return `<div id="bookingPopup" class="popup-overlay" aria-hidden="true"><div class="popup" role="dialog" aria-modal="true" aria-labelledby="popupServiceTitle"><button class="close-btn" aria-label="Fechar">×</button><div class="popup-header"><h2 id="popupServiceTitle">Agendar sessão</h2></div><div class="popup-body"><div class="tidycal-embed" data-path="traphouzerecords"></div></div></div></div>`; }
 
 function renderSite() {
-  document.getElementById('site').innerHTML = `<nav><a href="#home" aria-label="Início"><img src="images/Logo.png" alt="${escapeHtml(content.site.name)}" class="nav-logo"></a><ul>${visibleNav().map(item => `<li><a href="#${escapeHtml(item.id)}">${escapeHtml(item.label)}</a></li>`).join('')}</ul></nav>${renderHero()}${renderServices()}${renderEquipment()}${renderAbout()}${renderArtists()}${renderReviews()}<footer><p>© ${new Date().getFullYear()} ${escapeHtml(content.site.name)}</p><p>${escapeHtml(content.site.location)}</p></footer><button class="help-button" aria-label="Contactos">?</button><div id="helpPopup" class="help-popup"><div class="help-popup-header"><h4>Contactos</h4><button class="close-help" aria-label="Fechar">×</button></div><div class="help-content"><a href="mailto:${escapeHtml(content.site.email)}">${escapeHtml(content.site.email)}</a><a href="${escapeHtml(content.site.instagram)}" target="_blank" rel="noopener">${escapeHtml(content.site.instagramHandle)}</a><a href="https://wa.me/${escapeHtml(content.site.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a><p>${escapeHtml(content.site.hours)}</p></div></div>${renderModal()}${renderBooking()}`;
+  document.getElementById('site').innerHTML = `<nav><a href="#home" aria-label="Início"><img src="images/Logo.png" alt="${escapeHtml(content.site.name)}" class="nav-logo"></a><ul>${visibleNav().map(item => `<li><a href="#${escapeHtml(item.id)}">${escapeHtml(item.label)}</a></li>`).join('')}</ul></nav>${renderHero()}${renderServices()}${renderEquipment()}${renderAbout()}${renderArtists()}${renderReviews()}<footer><p>© ${new Date().getFullYear()} ${escapeHtml(content.site.name)}</p><p>${escapeHtml(content.site.location)}</p></footer><button class="help-button" aria-label="Contactos">?</button><div id="helpPopup" class="help-popup"><div class="help-popup-header"><h4>Contactos</h4><button class="close-help" aria-label="Fechar">×</button></div><div class="help-content"><a href="mailto:${escapeHtml(content.site.email)}">${escapeHtml(content.site.email)}</a><a href="${escapeHtml(content.site.instagram)}" target="_blank" rel="noopener">${escapeHtml(content.site.instagramHandle)}</a><a href="https://wa.me/${escapeHtml(content.site.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a><p>${escapeHtml(content.site.hours)}</p></div></div>${renderModal()}${renderArtistModal()}${renderBooking()}`;
 }
 
 function showEquipment(index) {
@@ -67,10 +69,20 @@ function openBooking(service) {
   popup.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
 }
+function showArtist(index) {
+  const artist = content.artists[index];
+  const links = Array.isArray(artist.links) ? artist.links : [];
+  const catalog = Array.isArray(artist.catalog) ? artist.catalog : [];
+  document.getElementById('artistModalTitle').textContent = artist.name;
+  document.getElementById('artistModalBody').innerHTML = `<div class="artist-modal-profile"><img class="artist-modal-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div><p class="artist-modal-genre">${escapeHtml(artist.genre || 'Artista Trap Houze Records')}</p><p class="artist-modal-bio">${escapeHtml(artist.bio || 'Perfil em atualização.')}</p></div></div><section class="artist-modal-section"><h4>Ligações</h4><div class="artist-links">${links.map(link => safeUrl(link.url) ? `<a href="${escapeHtml(safeUrl(link.url))}" target="_blank" rel="noopener">${escapeHtml(link.label || 'Abrir ligação')} <span>↗</span></a>` : '').join('') || '<p>As ligações deste artista serão disponibilizadas em breve.</p>'}</div></section><section class="artist-modal-section"><h4>Catálogo Trap Houze</h4><div class="artist-catalog">${catalog.map(item => `<article><div><strong>${escapeHtml(item.title || 'Lançamento')}</strong><small>${escapeHtml(item.type || 'Projeto Trap Houze')}</small></div>${safeUrl(item.url) ? `<a href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noopener">Ouvir ↗</a>` : '<span>Em breve</span>'}</article>`).join('') || '<p>Ainda não existem lançamentos publicados no catálogo Trap Houze.</p>'}</div></section>`;
+  const modal = document.getElementById('artistModal');
+  modal.classList.add('active'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
+}
 function closeOverlays() {
   document.querySelectorAll('.modal.active, .popup-overlay.active').forEach(element => {
     element.classList.remove('active');
     if (element.id === 'bookingPopup') element.setAttribute('aria-hidden', 'true');
+    if (element.id === 'artistModal') element.setAttribute('aria-hidden', 'true');
   });
   document.body.style.overflow = '';
 }
@@ -79,11 +91,14 @@ function bindEvents() {
   document.addEventListener('click', event => {
     const service = event.target.closest('[data-service]');
     const equipment = event.target.closest('[data-equipment]');
+    const artist = event.target.closest('[data-artist]');
     if (service) openBooking(content.services[Number(service.dataset.service)]);
     if (equipment) showEquipment(Number(equipment.dataset.equipment));
+    if (artist) showArtist(Number(artist.dataset.artist));
     if (event.target.closest('.close-modal, .close-btn') || event.target.matches('.modal, .popup-overlay')) closeOverlays();
     if (event.target.closest('.help-button, .close-help')) document.getElementById('helpPopup').classList.toggle('active');
   });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') closeOverlays(); });
 }
 function startSlides() { setInterval(() => { const slides = document.querySelectorAll('.slide'); if (!slides.length) return; slides[activeSlide].classList.remove('active'); activeSlide = (activeSlide + 1) % slides.length; slides[activeSlide].classList.add('active'); }, 5000); }
 

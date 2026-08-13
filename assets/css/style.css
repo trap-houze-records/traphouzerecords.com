@@ -666,7 +666,11 @@ section {
 .artist-item {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.08);
+    color: inherit;
     cursor: pointer;
+    font: inherit;
+    padding: 0;
+    text-align: left;
     transition: all 0.3s;
 }
 
@@ -703,6 +707,14 @@ section {
 .artist-item-name p {
     color: rgba(255, 255, 255, 0.5);
     font-size: 0.75rem;
+    text-transform: uppercase;
+}
+.artist-item-name span {
+    color: #c5ff5c;
+    display: block;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    margin-top: 13px;
     text-transform: uppercase;
 }
 
@@ -752,6 +764,30 @@ section {
 .artist-testimonial-box p {
     font-style: italic;
 }
+
+/* Perfil de artista */
+.artist-modal-content { max-width: 760px; }
+.artist-modal .modal-header { align-items: flex-start; }
+.artist-modal .modal-header .eyebrow { margin: 0 0 7px; }
+.artist-modal-body { display: grid; gap: 34px; }
+.artist-modal-profile { display: grid; gap: 24px; grid-template-columns: minmax(180px, .72fr) minmax(0, 1fr); }
+.artist-modal-image { background: #121212; height: 265px; margin: 0; object-fit: cover; width: 100%; }
+.artist-modal-genre { color: #c5ff5c; font-size: .73rem; letter-spacing: .13em; margin: 3px 0 16px; text-transform: uppercase; }
+.artist-modal-bio { color: rgba(255,255,255,.7); line-height: 1.75; margin: 0; }
+.artist-modal-section { border-top: 1px solid rgba(255,255,255,.12); padding-top: 24px; }
+.artist-modal-section h4 { margin: 0 0 15px; }
+.artist-modal-section > p { color: rgba(255,255,255,.5); font-size: .88rem; margin: 0; }
+.artist-links { display: flex; flex-wrap: wrap; gap: 10px; }
+.artist-links a { border: 1px solid rgba(197,255,92,.55); color: #c5ff5c; font-size: .78rem; padding: 10px 12px; text-decoration: none; }
+.artist-links a:hover { background: #c5ff5c; color: #111; }
+.artist-links a span { margin-left: 7px; }
+.artist-catalog { display: grid; border-top: 1px solid rgba(255,255,255,.08); }
+.artist-catalog article { align-items: center; border-bottom: 1px solid rgba(255,255,255,.08); display: flex; gap: 18px; justify-content: space-between; padding: 15px 0; }
+.artist-catalog article > div { display: grid; gap: 5px; }
+.artist-catalog strong { font-size: .92rem; font-weight: 500; }
+.artist-catalog small, .artist-catalog > p { color: rgba(255,255,255,.5); font-size: .74rem; }
+.artist-catalog a { color: #c5ff5c; font-size: .74rem; text-decoration: none; }
+.artist-catalog article > span { color: rgba(255,255,255,.46); font-size: .72rem; }
 
 /* ========== AVALIAÇÕES ========== */
 .reviews {
