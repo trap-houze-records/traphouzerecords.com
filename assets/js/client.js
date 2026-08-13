@@ -51,17 +51,33 @@ function renderBooking(booking) {
   const payment = booking.paid ? '<span>Pago ✓</span>' : hasAmount ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">Pagar ${money(booking.amount)}</button>` : '<span class="booking-payment-unset">Pagamento a definir</span>';
   return `<article class="booking-row"><time>${escapeHtml(booking.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(booking.time || '')}</p></div><div class="booking-payment ${booking.paid ? 'paid' : 'pending'}">${payment}</div></article>`;
 }
+function bookingMoment(booking) {
+  const value = String(booking.date || '').trim().replace(' ', 'T');
+  const moment = new Date(value);
+  return Number.isNaN(moment.getTime()) ? null : moment;
+}
+function splitBookings(bookings) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dated = bookings.map((booking, index) => ({ booking, index, moment: bookingMoment(booking) }));
+  const compare = (a, b) => (a.moment?.getTime() || 0) - (b.moment?.getTime() || 0) || a.index - b.index;
+  return {
+    upcoming: dated.filter(item => !item.moment || item.moment >= today).sort(compare).map(item => item.booking),
+    history: dated.filter(item => item.moment && item.moment < today).sort((a, b) => compare(b, a)).map(item => item.booking)
+  };
+}
 
 const portal = document.getElementById('clientPortal');
 
 function renderPortal() {
 const outstanding = [...clientData.tracks, ...clientData.bookings].filter(item => !item.paid).reduce((total, item) => total + Number(item.amount || 0), 0);
 const portalNote = apiBase ? 'Área privada · acesso protegido por credenciais.' : 'Protótipo local · o acesso real de cada cliente será ligado numa fase seguinte.';
+const bookings = splitBookings(clientData.bookings);
 portal.innerHTML = `<div class="client-shell client-simple">
   <header class="client-header"><a class="client-brand" href="index.html" aria-label="Trap Houze Records"><img src="images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div class="client-user"><span>Olá, ${escapeHtml(clientData.client)}</span>${apiBase ? '<a class="client-book-session" href="booking.html">Agendar sessão</a>' : ''}<button class="client-signout" type="button">Sair</button></div></header>
-  <section class="client-simple-hero"><p class="eyebrow">O teu trabalho</p><h1>As tuas músicas</h1><p>Acompanha o estado de cada faixa e os pagamentos associados.</p>${outstanding ? `<div class="client-total-due"><span>Total em falta</span><strong>${money(outstanding)}</strong></div>` : ''}</section>
-  <section class="track-list">${clientData.tracks.map(renderTrack).join('')}</section>
-  <section class="booking-section"><div class="booking-section-heading"><div><p class="eyebrow">Estúdio</p><h2>Reservas</h2></div><span>${clientData.bookings.length} registadas</span></div><div class="booking-list">${clientData.bookings.map(renderBooking).join('')}</div></section>
+  <section class="client-simple-hero"><p class="eyebrow">O teu trabalho</p><h1>A tua agenda</h1><p>Reservas, músicas e pagamentos num só lugar.</p>${outstanding ? `<div class="client-total-due"><span>Total em falta</span><strong>${money(outstanding)}</strong></div>` : ''}</section>
+  <section class="booking-section booking-section-upcoming"><div class="booking-section-heading"><div><p class="eyebrow">Próximas sessões</p><h2>Reservas futuras</h2></div><span>${bookings.upcoming.length} agendadas</span></div><div class="booking-list">${bookings.upcoming.map(renderBooking).join('') || '<p class="client-empty">Ainda não tens reservas futuras.</p>'}</div></section>
+  <section class="track-section"><div class="booking-section-heading"><div><p class="eyebrow">Música</p><h2>As tuas músicas</h2></div><span>${clientData.tracks.length} registadas</span></div><div class="track-list">${clientData.tracks.map(renderTrack).join('') || '<p class="client-empty">Ainda não tens músicas registadas.</p>'}</div></section>
+  <section class="booking-section booking-section-history"><div class="booking-section-heading"><div><p class="eyebrow">Histórico</p><h2>Reservas anteriores</h2></div><span>${bookings.history.length} concluídas</span></div><div class="booking-list">${bookings.history.map(renderBooking).join('') || '<p class="client-empty">Ainda não existem reservas anteriores.</p>'}</div></section>
   <aside class="client-simple-help"><span>Precisas de ajuda?</span><a href="https://wa.me/351910734914" target="_blank" rel="noopener">Abrir WhatsApp <b>→</b></a></aside>
   <p class="client-demo">${portalNote}</p>
 </div>`;

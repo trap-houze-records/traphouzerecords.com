@@ -185,6 +185,9 @@ button.admin-dashboard-card:hover { border-color: #c5ff5c; }
 .booking-panel { border: 1px solid rgba(255,255,255,.14); background: #17191b; }
 .booking-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; border-bottom: 1px solid rgba(255,255,255,.1); padding: 20px 24px; }
 .booking-panel-head > div { display: grid; gap: 4px; }
+.booking-panel-title { align-items: center; display: flex !important; gap: 14px; }
+.booking-client-back { align-items: center; border-right: 1px solid rgba(255,255,255,.16); color: #c5ff5c; display: inline-flex; font-size: 1.25rem; line-height: 1; padding: 5px 14px 5px 0; text-decoration: none; }
+.booking-client-back span { color: rgba(255,255,255,.68) !important; font-size: .72rem !important; letter-spacing: .05em; margin-left: 6px; text-transform: uppercase; }
 .booking-panel-head strong { font-size: 1rem; font-weight: 500; }
 .booking-panel-head span { color: rgba(255,255,255,.56); font-size: .78rem; }
 .booking-panel-head > span { color: #c5ff5c; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
@@ -1048,17 +1051,18 @@ footer p {
 .client-simple-hero > p:not(.eyebrow) { color: rgba(255,255,255,.6); }
 .client-total-due { display: flex; justify-content: space-between; align-items: center; width: min(100%, 430px); margin-top: 28px; border: 1px solid #ffd06a; color: #ffd06a; padding: 14px; }
 .client-total-due strong { font-size: 1.2rem; }
-.track-list { display: grid; gap: 16px; }
-.track-card { border: 1px solid rgba(255,255,255,.14); background: #111; padding: 28px; }
+.track-section { margin-top: 46px; }
+.track-list { display: grid; gap: 10px; }
+.track-card { border: 1px solid rgba(255,255,255,.14); background: #111; padding: 17px 20px; }
 .track-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; }
-.track-heading h2 { font-size: clamp(1.6rem, 3vw, 2.5rem); letter-spacing: -.02em; text-transform: uppercase; }
-.track-stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 30px; background: #292929; }
-.track-stage { display: grid; grid-template-columns: 25px 1fr; align-items: center; gap: 9px; background: #171717; color: rgba(255,255,255,.38); padding: 15px; }
-.track-stage span { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: .67rem; }
-.track-stage strong { font-size: .82rem; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+.track-heading h2 { font-size: clamp(1.2rem, 2vw, 1.55rem); letter-spacing: -.02em; text-transform: uppercase; }
+.track-stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 16px; background: #292929; }
+.track-stage { display: grid; grid-template-columns: 20px 1fr; align-items: center; gap: 7px; background: #171717; color: rgba(255,255,255,.38); padding: 10px; }
+.track-stage span { display: grid; width: 18px; height: 18px; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: .61rem; }
+.track-stage strong { font-size: .72rem; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
 .track-stage.complete { background: #202b10; color: #c5ff5c; }
 .track-stage.current { background: #c5ff5c; color: #111; }
-.track-payment { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.1); color: rgba(255,255,255,.7); font-size: .88rem; }
+.track-payment { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); color: rgba(255,255,255,.7); font-size: .8rem; }
 .track-payment.pending { color: #ffd06a; }
 .track-payment button { border: 1px solid currentColor; background: transparent; color: inherit; padding: 8px 11px; cursor: pointer; font: inherit; font-size: .77rem; }
 .track-payment-mark { color: #c5ff5c; font-size: 1.2rem; }
@@ -1066,6 +1070,9 @@ footer p {
 .client-simple-help a { color: #fff; text-decoration: none; }
 .client-simple-help b { color: #c5ff5c; font-size: 1.3rem; margin-left: 12px; }
 .booking-section { margin-top: 54px; }
+.booking-section-upcoming { margin-top: 0; }
+.booking-section-history { margin-top: 46px; }
+.client-empty { border-top: 1px solid rgba(255,255,255,.15); color: rgba(255,255,255,.48); font-size: .86rem; padding: 18px 0; }
 .booking-section-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 18px; }
 .booking-section-heading h2 { margin-top: 7px; font-size: 1.55rem; letter-spacing: .02em; text-transform: uppercase; }
 .booking-section-heading > span { color: rgba(255,255,255,.4); font-size: .78rem; }
