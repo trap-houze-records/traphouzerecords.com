@@ -189,6 +189,8 @@ button.admin-dashboard-card:hover { border-color: #c5ff5c; }
 .booking-panel-meta { display: grid; gap: 4px; }
 .booking-client-back { align-items: center; border: 1px solid rgba(197,255,92,.52); color: #c5ff5c; display: inline-flex; font-size: 1.25rem; height: 32px; justify-content: center; line-height: 1; text-decoration: none; width: 32px; }
 .booking-client-back:hover { background: #c5ff5c; color: #111; }
+.booking-confirm-back { align-items: center; color: #c5ff5c; display: inline-flex; font-size: 1.1rem; gap: 7px; margin-top: 22px; text-decoration: none; }
+.booking-confirm-back span { font-size: .76rem; letter-spacing: .06em; text-transform: uppercase; }
 .booking-panel-head strong { font-size: 1rem; font-weight: 500; }
 .booking-panel-head span { color: rgba(255,255,255,.56); font-size: .78rem; }
 .booking-panel-head > span { color: #c5ff5c; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
