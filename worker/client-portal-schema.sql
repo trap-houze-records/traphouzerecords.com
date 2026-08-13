@@ -31,6 +31,7 @@ CREATE TABLE client_tracks (
   payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid')),
   amount_cents INTEGER NOT NULL DEFAULT 0 CHECK (amount_cents >= 0),
   payment_url TEXT,
+  samply_url TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

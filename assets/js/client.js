@@ -28,7 +28,7 @@ function normalisePortal(data) {
   const appointmentKeys = new Set(appointments.map(item => `${item.service}|${item.date}`));
   return {
     client: data.client.name,
-    tracks: (data.tracks || []).map(item => ({ title: item.title, stage: item.stage, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' })),
+    tracks: (data.tracks || []).map(item => ({ title: item.title, stage: item.stage, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '', samplyUrl: item.samplyUrl || '' })),
     bookings: [...appointments, ...(data.bookings || []).filter(item => !appointmentKeys.has(`${item.service}|${item.startsAt || 'A confirmar'}`)).map(item => ({ id: item.id, date: item.startsAt || 'A confirmar', time: '', service: item.service, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' }))]
   };
 }
@@ -40,6 +40,10 @@ async function apiRequest(path, options = {}) {
 }
 
 function renderTrack(track) {
+  const samplyUrl = String(track.samplyUrl || '');
+  const samplyPlayer = /^https:\/\/(?:www\.)?samply\.app\/embed\/[A-Za-z0-9_-]+\/?(?:\?.*)?$/i.test(samplyUrl)
+    ? `<div class="track-samply"><p class="eyebrow">Ouvir no Samply</p><iframe src="${escapeHtml(samplyUrl)}" title="Player Samply: ${escapeHtml(track.title)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media"></iframe></div>`
+    : '';
   return `<article class="track-card">
     <div class="track-heading"><p class="eyebrow">Música</p><h2>${escapeHtml(track.title)}</h2></div>
     <div class="track-stages" aria-label="Estado do trabalho">
@@ -49,6 +53,7 @@ function renderTrack(track) {
         return `<div class="track-stage ${state}"><span>${index + 1}</span><strong>${label}</strong></div>`;
       }).join('')}
     </div>
+    ${samplyPlayer}
     <div class="track-payment ${track.paid ? 'paid' : 'pending'}"><span>${track.paid ? 'Pagamento confirmado' : `Pagamento pendente · ${money(track.amount)}`}</span>${track.paid ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.amount)}</button>`}</div>
   </article>`;
 }

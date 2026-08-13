@@ -191,7 +191,7 @@ async function portalData(clientId, env) {
   const client = await db.prepare('SELECT id, display_name AS name, username, phone, active FROM clients WHERE id = ?').bind(clientId).first();
   if (!client) return null;
   const [tracks, bookings, appointments] = await db.batch([
-    db.prepare("SELECT id, title, stage, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl FROM client_tracks WHERE client_id = ? ORDER BY created_at DESC").bind(clientId),
+    db.prepare("SELECT id, title, stage, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl, samply_url AS samplyUrl FROM client_tracks WHERE client_id = ? ORDER BY created_at DESC").bind(clientId),
     db.prepare("SELECT id, service, starts_at AS startsAt, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl FROM client_bookings WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId),
     db.prepare("SELECT id, service, starts_at AS startsAt, ends_at AS endsAt, status FROM studio_appointments WHERE client_id = ? AND status != 'cancelled' ORDER BY starts_at DESC").bind(clientId)
   ]);
@@ -301,6 +301,14 @@ function paymentStatus(value) {
 function paymentUrl(value) {
   if (!value) return null;
   try { const url = new URL(value); if (url.protocol !== 'https:') throw new Error(); return url.toString(); } catch { throw inputError('O link de pagamento deve usar HTTPS.'); }
+}
+function samplyPlayerUrl(value) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || !['samply.app', 'www.samply.app'].includes(url.hostname) || !/^\/embed\/[A-Za-z0-9_-]+\/?$/.test(url.pathname)) throw new Error();
+    return url.toString();
+  } catch { throw inputError('Use o link de embed do Samply (https://samply.app/embed/…).'); }
 }
 function appointmentDate(value, label) {
   const date = new Date(String(value || ''));
@@ -690,7 +698,7 @@ async function portalAdminMutation(request, env, resource, id) {
     const title = String((isTrack ? body.title : body.service) || '').trim();
     if (!clientId || !title) return error('Dados incompletos.');
     const itemId = randomId();
-    if (isTrack) await db.prepare('INSERT INTO client_tracks (id, client_id, title, stage, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(itemId, clientId, title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', paymentStatus(body.paymentStatus || 'pending'), cents(body.amount || 0), paymentUrl(body.paymentUrl)).run();
+    if (isTrack) await db.prepare('INSERT INTO client_tracks (id, client_id, title, stage, payment_status, amount_cents, payment_url, samply_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(itemId, clientId, title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', paymentStatus(body.paymentStatus || 'pending'), cents(body.amount || 0), paymentUrl(body.paymentUrl), samplyPlayerUrl(body.samplyUrl)).run();
     else await db.prepare('INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(itemId, clientId, title, body.startsAt || null, paymentStatus(body.paymentStatus || 'pending'), cents(body.amount || 0), paymentUrl(body.paymentUrl)).run();
     await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), clientId, admin.login, `${resource}.created`).run();
     return jsonResponse({ id: itemId }, 201);
@@ -704,7 +712,7 @@ async function portalAdminMutation(request, env, resource, id) {
   }
   const title = String((isTrack ? body.title : body.service) || '').trim();
   if (!title) return error('Título inválido.');
-  if (isTrack) await db.prepare('UPDATE client_tracks SET title = ?, stage = ?, payment_status = ?, amount_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', paymentStatus(body.paymentStatus), cents(body.amount), paymentUrl(body.paymentUrl), id).run();
+  if (isTrack) await db.prepare('UPDATE client_tracks SET title = ?, stage = ?, payment_status = ?, amount_cents = ?, payment_url = ?, samply_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', paymentStatus(body.paymentStatus), cents(body.amount), paymentUrl(body.paymentUrl), samplyPlayerUrl(body.samplyUrl), id).run();
   else await db.prepare('UPDATE client_bookings SET service = ?, starts_at = ?, payment_status = ?, amount_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(title, body.startsAt || null, paymentStatus(body.paymentStatus), cents(body.amount), paymentUrl(body.paymentUrl), id).run();
   await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), item.client_id, admin.login, `${resource}.updated`).run();
   return jsonResponse({ ok: true });
