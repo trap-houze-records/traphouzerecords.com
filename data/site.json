@@ -34,7 +34,7 @@
     {
       "id": "artists",
       "label": "Artistas",
-      "visible": false
+      "visible": true
     },
     {
       "id": "reviews",
