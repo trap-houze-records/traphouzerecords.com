@@ -317,6 +317,35 @@ async function refreshGoogleConnection(env, current) {
   await storeGoogleConnection(env, refreshed);
   return refreshed;
 }
+async function financeSummary(request, env) {
+  const admin = await adminSession(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  const db = clientDb(env);
+  const records = await db.prepare(`
+    SELECT t.id, t.client_id AS clientId, c.display_name AS clientName, 'track' AS type, t.title AS description, t.stage, t.payment_status AS paymentStatus, t.amount_cents AS amountCents, t.payment_url AS paymentUrl, t.created_at AS createdAt
+    FROM client_tracks t JOIN clients c ON c.id = t.client_id
+    UNION ALL
+    SELECT b.id, b.client_id AS clientId, c.display_name AS clientName, 'booking' AS type, b.service AS description, NULL AS stage, b.payment_status AS paymentStatus, b.amount_cents AS amountCents, b.payment_url AS paymentUrl, COALESCE(b.starts_at, b.created_at) AS createdAt
+    FROM client_bookings b JOIN clients c ON c.id = b.client_id
+    ORDER BY createdAt DESC
+  `).all();
+  const items = records.results || [];
+  const totals = items.reduce((summary, item) => {
+    const amount = Number(item.amountCents || 0);
+    summary.total += amount;
+    if (item.paymentStatus === 'paid') summary.paid += amount;
+    else { summary.pending += amount; summary.pendingCount += 1; }
+    return summary;
+  }, { total: 0, paid: 0, pending: 0, pendingCount: 0 });
+  const byClient = new Map();
+  items.forEach(item => {
+    const entry = byClient.get(item.clientId) || { clientId: item.clientId, clientName: item.clientName, paid: 0, pending: 0, items: 0 };
+    entry.items += 1;
+    entry[item.paymentStatus === 'paid' ? 'paid' : 'pending'] += Number(item.amountCents || 0);
+    byClient.set(item.clientId, entry);
+  });
+  return jsonResponse({ totals, items, clients: [...byClient.values()].sort((a, b) => b.pending - a.pending || b.paid - a.paid) });
+}
 async function googleServiceAccessToken(env) {
   const now = Math.floor(Date.now() / 1000);
   const unsigned = `${base64UrlText(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${base64UrlText(JSON.stringify({ iss: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, scope: 'https://www.googleapis.com/auth/calendar', aud: 'https://oauth2.googleapis.com/token', iat: now - 30, exp: now + 3300 }))}`;
@@ -634,6 +663,7 @@ export default {
       else if (url.pathname === '/studio/availability' && request.method === 'GET') response = await publicAvailability(request, env);
       else if (url.pathname === '/studio/booking' && request.method === 'POST') response = await publicBooking(request, env);
       else if (url.pathname === '/client/admin/clients' && request.method === 'GET') response = await portalAdminClients(request, env);
+      else if (url.pathname === '/finance/summary' && request.method === 'GET') response = await financeSummary(request, env);
       else if (url.pathname === '/client/admin/clients' && request.method === 'POST') response = await portalCreateClient(request, env);
       else if (/^\/client\/admin\/clients\/[0-9a-f-]{36}$/i.test(url.pathname) && request.method === 'GET') response = await portalAdminClient(request, env, url.pathname.split('/').pop());
       else if (url.pathname === '/studio/appointments' && request.method === 'GET') response = await studioSchedule(request, env);
