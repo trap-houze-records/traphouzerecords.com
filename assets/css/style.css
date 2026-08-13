@@ -1128,23 +1128,16 @@ footer p {
 .booking-intro { max-width: 700px; }
 .booking-panel { box-shadow: 0 22px 70px rgba(0,0,0,.18); }
 .booking-duration { padding: 18px 24px; }
-.booking-service-control select { padding: 10px 34px 10px 11px; }
+.booking-service-control label { flex: 1 1 300px; min-width: 0; }
+.booking-service-control select { max-width: 100%; padding: 10px 34px 10px 11px; width: 100%; }
 .booking-service-control > div { min-width: 116px; }
 .booking-days button { border-radius: 2px; transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease; }
 .booking-days button.available:hover { transform: translateY(-1px); }
 .booking-aside { background: linear-gradient(180deg, #202326, #1c1f21); }
 .booking-time-fields select { border-color: rgba(22,199,243,.38); min-height: 42px; }
-.booking-service-control label, .booking-service-control select { min-width: 0; }
-.booking-service-control label { max-width: 100%; overflow: hidden; }
-.booking-service-control select { overflow: hidden; text-overflow: ellipsis; }
-.booking-service-picker { display: grid; gap: 9px; min-width: min(100%, 610px); }
-.booking-service-picker > span { color: rgba(255,255,255,.62); font-size: .76rem; }
-.booking-service-picker [role="radiogroup"] { display: grid; gap: 7px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.booking-service-picker button { background: #111; border: 1px solid rgba(255,255,255,.17); color: #fff; cursor: pointer; display: grid; gap: 5px; min-width: 0; padding: 11px; text-align: left; transition: background .18s ease, border-color .18s ease; }
-.booking-service-picker button:hover { border-color: rgba(22,199,243,.55); }
-.booking-service-picker button.selected { background: rgba(22,199,243,.09); border-color: #16c7f3; }
-.booking-service-picker button strong { font-size: .77rem; font-weight: 500; line-height: 1.32; overflow-wrap: anywhere; }
-.booking-service-picker button small { color: #16c7f3; font-size: .7rem; }
+.booking-half-hour-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.booking-half-hour-slots button { font-size: .82rem; padding: 10px 6px; }
+.booking-half-hour-slots button.range-start { box-shadow: inset 0 0 0 1px #fff; }
 .booking-section-upcoming { margin-top: 0; }
 .booking-section-history { margin-top: 46px; }
 .client-empty { border-top: 1px solid rgba(255,255,255,.15); color: rgba(255,255,255,.48); font-size: .86rem; padding: 18px 0; }
@@ -1282,7 +1275,7 @@ footer p {
     .booking-calendar, .booking-aside { padding: 24px 18px; }
     .booking-month-nav { grid-template-columns: 86px 1fr 86px; }
     .booking-service-control { align-items: stretch; display: grid; gap: 0; grid-template-columns: 1fr 1fr; }
-    .booking-service-control label, .booking-service-picker { grid-column: 1 / -1; margin-bottom: 14px; }
+    .booking-service-control label { grid-column: 1 / -1; margin-bottom: 14px; }
     .booking-service-control select { max-width: none; width: 100%; }
     .booking-service-control > div { min-width: 0; padding: 0 12px 0 0; }
     .booking-service-control > div + div { border-left: 1px solid rgba(255,255,255,.12); padding-left: 12px; }
@@ -1434,9 +1427,7 @@ footer p {
     .booking-month-nav { grid-template-columns: 72px 1fr 72px; margin-bottom: 22px; }
     .booking-month-nav button { font-size: .68rem; }
     .booking-aside h2 { font-size: 1.35rem; }
-    .booking-service-picker [role="radiogroup"] { grid-template-columns: 1fr; }
-    .booking-service-picker button { align-items: center; grid-template-columns: 1fr auto; padding: 10px 11px; }
-    .booking-service-picker button small { text-align: right; white-space: nowrap; }
+    .booking-half-hour-slots { gap: 7px; }
     .booking-time-fields { gap: 9px; margin: 16px 0; }
     .booking-summary, .booking-empty-note { margin-top: 20px; padding-top: 14px; }
 }
