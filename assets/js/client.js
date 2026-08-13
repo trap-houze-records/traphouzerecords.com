@@ -42,7 +42,7 @@ async function apiRequest(path, options = {}) {
 function renderTrack(track) {
   const samplyUrl = String(track.samplyUrl || '');
   const samplyPlayer = /^https:\/\/(?:www\.)?samply\.app\/embed\/[A-Za-z0-9_-]+\/?(?:\?.*)?$/i.test(samplyUrl)
-    ? `<div class="track-samply"><div class="track-samply-heading"><p class="eyebrow">Ouvir no Samply</p><button class="track-samply-toggle" type="button" data-toggle-samply aria-expanded="false">Comentários e versões</button></div><iframe src="${escapeHtml(samplyUrl)}" title="Player Samply: ${escapeHtml(track.title)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media"></iframe><p class="track-samply-note">No leitor, abre a faixa para ver as versões e deixar um comentário.</p></div>`
+    ? `<div class="track-samply"><p class="eyebrow">Ouvir no Samply</p><iframe src="${escapeHtml(samplyUrl)}" title="Player Samply: ${escapeHtml(track.title)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media"></iframe></div>`
     : '';
   return `<article class="track-card">
     <div class="track-heading"><p class="eyebrow">Música</p><h2>${escapeHtml(track.title)}</h2></div>
@@ -135,14 +135,6 @@ function renderLogin(message = '') {
 }
 
 document.addEventListener('click', event => {
-  const samplyToggle = event.target.closest('[data-toggle-samply]');
-  if (samplyToggle) {
-    const player = samplyToggle.closest('.track-samply');
-    const expanded = player.classList.toggle('expanded');
-    samplyToggle.setAttribute('aria-expanded', String(expanded));
-    samplyToggle.textContent = expanded ? 'Fechar leitor' : 'Comentários e versões';
-    return;
-  }
   const payment = event.target.closest('[data-payment-url]');
   if (payment) {
     const url = payment.dataset.paymentUrl;
