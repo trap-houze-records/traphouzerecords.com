@@ -347,6 +347,10 @@ function googleDateTime(value) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
 }
+function googleEventDateTime(value) {
+  const normalized = String(value || '').replace(' ', 'T');
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized) ? `${normalized}:00` : normalized;
+}
 async function googleBusyEvents(env, from, until) {
   let connection;
   try { connection = await activeGoogleConnection(env); } catch { return []; }
@@ -367,7 +371,7 @@ async function googleSyncAppointment(env, db, appointment) {
   if (!connection?.calendarId || appointment.status === 'cancelled') return appointment.googleEventId || null;
   const client = appointment.clientId ? await db.prepare('SELECT display_name AS name, phone FROM clients WHERE id = ?').bind(appointment.clientId).first() : null;
   const name = client?.name || appointment.guestName || 'Cliente';
-  const event = { summary: `🎧 ${appointment.service} — ${name}`, description: `Reserva Trap Houze Records\nCliente: ${name}${client?.phone || appointment.guestPhone ? `\nWhatsApp: ${client?.phone || appointment.guestPhone}` : ''}${appointment.notes ? `\nNotas: ${appointment.notes}` : ''}\nEstado: ${appointment.status}`, location: 'Trap Houze Records', start: { dateTime: appointment.startsAt.replace(' ', 'T'), timeZone: 'Europe/Lisbon' }, end: { dateTime: appointment.endsAt.replace(' ', 'T'), timeZone: 'Europe/Lisbon' } };
+  const event = { summary: `🎧 ${appointment.service} — ${name}`, description: `Reserva Trap Houze Records\nCliente: ${name}${client?.phone || appointment.guestPhone ? `\nWhatsApp: ${client?.phone || appointment.guestPhone}` : ''}${appointment.notes ? `\nNotas: ${appointment.notes}` : ''}\nEstado: ${appointment.status}`, location: 'Trap Houze Records', start: { dateTime: googleEventDateTime(appointment.startsAt), timeZone: 'Europe/Lisbon' }, end: { dateTime: googleEventDateTime(appointment.endsAt), timeZone: 'Europe/Lisbon' } };
   const id = appointment.googleEventId;
   const result = await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events${id ? `/${encodeURIComponent(id)}` : ''}`, { method: id ? 'PUT' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event) });
   const googleEventId = result.payload.id;
