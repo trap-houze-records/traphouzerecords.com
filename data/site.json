@@ -146,7 +146,12 @@
     {
       "name": "J-Dot",
       "genre": "Artista",
-      "image": "https://www.image2url.com/r2/default/images/1786545581646-3b7cb986-50a1-4f95-8055-c3d62c36344f.jpeg"
+      "image": "https://www.image2url.com/r2/default/images/1786545581646-3b7cb986-50a1-4f95-8055-c3d62c36344f.jpeg",
+      "instagram": "",
+      "youtube": "",
+      "spotify": "",
+      "appleMusic": "",
+      "spotifyPlaylist": "https://open.spotify.com/playlist/7q56qgHskQKwB9L9fW9JHi?si=VJiJnjKlQTm8N61pd8c1dg"
     },
     {
       "name": "Abtonas",
@@ -165,17 +170,32 @@
           "type": "Playlist Spotify",
           "url": "https://open.spotify.com/playlist/6bCuBDVE3uwiZEShHv09Zz?si=Bo-H_fhASp6C8uZ79JvI1w&utm_source=copy-link&pi=NZnyCF0QQ1K_8"
         }
-      ]
+      ],
+      "instagram": "",
+      "youtube": "",
+      "spotify": "https://open.spotify.com/artist/76BaVKSpZXsjpkpmY9ZVK2?si=1UUGN4hkR0iE4aOSi-AsyA&utm_source=copy-link",
+      "appleMusic": "",
+      "spotifyPlaylist": "https://open.spotify.com/playlist/6bCuBDVE3uwiZEShHv09Zz?si=Bo-H_fhASp6C8uZ79JvI1w&utm_source=copy-link&pi=NZnyCF0QQ1K_8"
     },
     {
       "name": "Gleo",
       "genre": "Artista ",
-      "image": ""
+      "image": "",
+      "instagram": "",
+      "youtube": "",
+      "spotify": "",
+      "appleMusic": "",
+      "spotifyPlaylist": ""
     },
     {
       "name": "Olly",
       "genre": "Artista ",
-      "image": ""
+      "image": "",
+      "instagram": "",
+      "youtube": "",
+      "spotify": "",
+      "appleMusic": "",
+      "spotifyPlaylist": ""
     }
   ],
   "reviews": []
