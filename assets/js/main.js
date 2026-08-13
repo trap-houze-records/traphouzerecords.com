@@ -2,7 +2,11 @@ let content;
 let activeSlide = 0;
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
-const safeUrl = value => { try { const url = new URL(String(value || '')); return ['https:', 'http:'].includes(url.protocol) ? url.toString() : ''; } catch { return ''; } };
+const safeUrl = value => {
+  const raw = String(value || '').trim();
+  if (/^(?:\.\/)?images\/[a-zA-Z0-9_./-]+$/.test(raw)) return raw.replace(/^\.\//, '');
+  try { const url = new URL(raw); return ['https:', 'http:'].includes(url.protocol) ? url.toString() : ''; } catch { return ''; }
+};
 const artistPlatforms = [['Instagram', 'instagram'], ['YouTube', 'youtube'], ['Spotify', 'spotify'], ['Apple Music', 'applemusic']];
 const spotifyPlaylistEmbed = value => {
   const url = safeUrl(value);

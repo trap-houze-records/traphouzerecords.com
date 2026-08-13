@@ -268,6 +268,8 @@ button.admin-dashboard-card:hover { border-color: #c5ff5c; }
 .admin-field > span { display: block; color: rgba(255,255,255,.65); font-size: .8rem; margin-bottom: 6px; }
 .admin-field input, .admin-field textarea, .admin-field select { width: 100%; border: 1px solid rgba(255,255,255,.18); background: #111; color: #fff; padding: 10px 12px; border-radius: 0; }
 .admin-field textarea { resize: vertical; min-height: 92px; }
+.artist-image-field small { display: block; color: rgba(255,255,255,.55); font-size: .76rem; margin-top: 7px; }
+.artist-image-field img { border: 1px solid rgba(255,255,255,.16); display: block; height: 170px; margin-top: 12px; object-fit: cover; width: min(100%, 250px); }
 .admin-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; gap: 12px; align-items: end; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 .admin-check { display: flex; gap: 8px; align-items: center; min-height: 42px; color: rgba(255,255,255,.8); cursor: pointer; }
 .admin-check input { accent-color: #fff; }

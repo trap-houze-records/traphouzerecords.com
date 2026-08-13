@@ -7,6 +7,12 @@ function base64Url(bytes) {
 }
 function base64UrlText(value) { return base64Url(encoder.encode(value)); }
 function base64Text(value) { return btoa(String.fromCharCode(...encoder.encode(value))); }
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  return btoa(binary);
+}
 function decodeBase64Url(value) {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
   return Uint8Array.from(atob(normalized), char => char.charCodeAt(0));
@@ -655,6 +661,23 @@ async function publish(request, env) {
   const result = await response.json();
   return jsonResponse({ commit: result.commit.sha });
 }
+async function uploadArtistImage(request, env) {
+  const user = await sessionFromRequest(request, env);
+  if (!user) return error('Inicie sessão para enviar uma imagem.', 401);
+  if (request.headers.get('Origin') !== env.ADMIN_ORIGIN) return error('Origem não autorizada.', 403);
+  if (!user.csrf || request.headers.get('x-cms-csrf') !== user.csrf) return error('Pedido de imagem inválido.', 403);
+  const form = await request.formData();
+  const file = form.get('image');
+  const allowed = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif' };
+  if (!(file instanceof File) || !allowed[file.type]) return error('Use uma imagem JPG, PNG, WebP ou AVIF.');
+  if (file.size > 5 * 1024 * 1024) return error('A imagem não pode ultrapassar 5 MB.');
+  const label = String(form.get('artist') || 'artista').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'artista';
+  const path = `images/artists/${label}-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${allowed[file.type]}`;
+  const token = await installationToken(env);
+  const response = await github(null, `/repos/${env.REPO_OWNER}/${env.REPO_NAME}/contents/${path}`, { method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ message: `media: imagem de artista por ${user.login}`, branch: env.BRANCH, content: bytesToBase64(new Uint8Array(await file.arrayBuffer())) }) });
+  const result = await response.json();
+  return jsonResponse({ path, commit: result.commit.sha }, 201);
+}
 
 export default {
   async fetch(request, env) {
@@ -668,6 +691,7 @@ export default {
       else if (url.pathname === '/auth/session' && request.method === 'GET') response = await session(request, env);
       else if (url.pathname === '/content' && request.method === 'GET') response = jsonResponse((await contentFromGitHub(env)).content);
       else if (url.pathname === '/publish' && request.method === 'POST') response = await publish(request, env);
+      else if (url.pathname === '/media/artists' && request.method === 'POST') response = await uploadArtistImage(request, env);
       else if (url.pathname === '/client/auth/login' && request.method === 'POST') response = await clientLogin(request, env);
       else if (url.pathname === '/client/auth/logout' && request.method === 'POST') response = await clientLogout(request, env);
       else if (url.pathname === '/client/portal' && request.method === 'GET') response = await clientPortal(request, env);

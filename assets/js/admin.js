@@ -54,7 +54,8 @@ function renderEquipment() { return `<section>${listCards('equipment', (item, in
 function renderAbout() { const about = draft.about; return `<section class="admin-grid">${card('Texto', `${field('Título', 'about.title', about.title)}${field('Parágrafos (um por linha)', 'about.paragraphs', about.paragraphs.join('\n'), 'textarea')}${field('Imagem (URL)', 'about.image', about.image)}`)}${card('Indicadores', about.stats.map((stat, index) => `<div class="admin-row">${field('Número', `about.stats.${index}.value`, stat.value)}${field('Descrição', `about.stats.${index}.label`, stat.label)}</div>`).join(''))}</section>`; }
 function artistPlatformUrl(item, property, legacyLabel) { return item[property] || (item.links || []).find(link => String(link.label || '').trim().toLowerCase() === legacyLabel.toLowerCase())?.url || ''; }
 function artistPlaylistUrl(item) { return item.spotifyPlaylist || (item.catalog || []).find(entry => /spotify/i.test(entry.type || '') || /open\.spotify\.com\/playlist/i.test(entry.url || ''))?.url || ''; }
-function renderArtists() { return `<section>${listCards('artists', (item, index) => card(item.name || `Artista ${index + 1}`, `${field('Nome', `artists.${index}.name`, item.name)}${field('Género / função', `artists.${index}.genre`, item.genre)}${field('Imagem (URL)', `artists.${index}.image`, item.image)}${field('Biografia', `artists.${index}.bio`, item.bio || '', 'textarea')}<div class="admin-row">${field('Instagram', `artists.${index}.instagram`, artistPlatformUrl(item, 'instagram', 'Instagram'), 'url')}${field('YouTube', `artists.${index}.youtube`, artistPlatformUrl(item, 'youtube', 'YouTube'), 'url')}${field('Spotify', `artists.${index}.spotify`, artistPlatformUrl(item, 'spotify', 'Spotify'), 'url')}${field('Apple Music', `artists.${index}.appleMusic`, artistPlatformUrl(item, 'appleMusic', 'Apple Music'), 'url')}</div>${field('Playlist Spotify do catálogo', `artists.${index}.spotifyPlaylist`, artistPlaylistUrl(item), 'url')}`, `<button class="admin-icon" data-remove="artists" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar artista')}</section>`; }
+function artistImageField(item, index) { return `<label class="admin-field artist-image-field"><span>Imagem do artista</span><input type="file" accept="image/jpeg,image/png,image/webp,image/avif" data-artist-image="${index}"><small>${item.image ? 'Imagem guardada no site. Escolha outro ficheiro para substituir.' : 'JPG, PNG, WebP ou AVIF · máximo 5 MB'}</small>${item.image ? `<img src="${escapeHtml(item.image)}" alt="Pré-visualização de ${escapeHtml(item.name || 'artista')}">` : ''}</label>`; }
+function renderArtists() { return `<section>${listCards('artists', (item, index) => card(item.name || `Artista ${index + 1}`, `${field('Nome', `artists.${index}.name`, item.name)}${field('Género / função', `artists.${index}.genre`, item.genre)}${artistImageField(item, index)}${field('Biografia', `artists.${index}.bio`, item.bio || '', 'textarea')}<div class="admin-row">${field('Instagram', `artists.${index}.instagram`, artistPlatformUrl(item, 'instagram', 'Instagram'), 'url')}${field('YouTube', `artists.${index}.youtube`, artistPlatformUrl(item, 'youtube', 'YouTube'), 'url')}${field('Spotify', `artists.${index}.spotify`, artistPlatformUrl(item, 'spotify', 'Spotify'), 'url')}${field('Apple Music', `artists.${index}.appleMusic`, artistPlatformUrl(item, 'appleMusic', 'Apple Music'), 'url')}</div>${field('Playlist Spotify do catálogo', `artists.${index}.spotifyPlaylist`, artistPlaylistUrl(item), 'url')}`, `<button class="admin-icon" data-remove="artists" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar artista')}</section>`; }
 function renderReviews() { return `<section>${listCards('reviews', (item, index) => card(item.name || `Avaliação ${index + 1}`, `${field('Nome', `reviews.${index}.name`, item.name)}${field('Texto', `reviews.${index}.text`, item.text, 'textarea')}`, `<button class="admin-icon" data-remove="reviews" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar avaliação')}</section>`; }
 
 function addItem(collection) { const models = { hero: { title: 'Novo destaque', subtitle: '', image: '' }, services: { title: 'Novo serviço', description: '', icon: '✦', action: 'booking', visible: true }, equipment: { id: 'novo-item', title: 'Novo equipamento', description: '', images: [] }, artists: { name: 'Novo artista', genre: '', image: '', bio: '', instagram: '', youtube: '', spotify: '', appleMusic: '', spotifyPlaylist: '' }, reviews: { name: 'Nome', text: '' } }; draft[collection].push(models[collection]); renderTab(); }
@@ -169,6 +170,27 @@ async function publish() {
   if (!response.ok) throw new Error(result.error || 'A publicação falhou.');
   notice(`Publicado com sucesso. Commit ${result.commit.slice(0, 7)}. O GitHub Pages pode demorar um momento a atualizar.`, 'success');
 }
+async function uploadArtistImage(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  if (isLocalPreview) { notice('O envio de imagens requer o Admin online.', 'muted'); input.value = ''; return; }
+  if (!apiBase || !sessionToken || !csrfToken) throw new Error('Inicie sessão para enviar imagens.');
+  const index = Number(input.dataset.artistImage);
+  if (!Number.isInteger(index) || !draft.artists[index]) throw new Error('Artista inválido.');
+  const form = new FormData();
+  form.append('image', file);
+  form.append('artist', draft.artists[index].name || 'artista');
+  input.disabled = true;
+  notice('A enviar imagem…');
+  try {
+    const response = await fetch(`${apiBase}/media/artists`, { method: 'POST', headers: { 'X-CMS-CSRF': csrfToken, Authorization: `Bearer ${sessionToken}` }, body: form });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Não foi possível enviar a imagem.');
+    draft.artists[index].image = result.path;
+    notice('Imagem guardada. Carregue em Publicar para a associar ao artista.', 'success');
+    renderTab();
+  } finally { input.disabled = false; }
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   const tokenMatch = location.hash.match(/(?:^#|&)cms_session=([^&]+)/);
@@ -178,7 +200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     history.replaceState(null, '', location.pathname + location.search);
   }
   document.addEventListener('input', event => { if (!event.target.matches('[data-bind]')) return; setPath(event.target.dataset.bind, parseSpecial(event.target.dataset.bind, event.target.value)); });
-  document.addEventListener('change', event => { if (!event.target.matches('[data-bind]')) return; setPath(event.target.dataset.bind, event.target.type === 'checkbox' ? event.target.checked : parseSpecial(event.target.dataset.bind, event.target.value)); });
+  document.addEventListener('change', event => { if (event.target.matches('[data-artist-image]')) { uploadArtistImage(event.target).catch(error => notice(error.message, 'error')); return; } if (!event.target.matches('[data-bind]')) return; setPath(event.target.dataset.bind, event.target.type === 'checkbox' ? event.target.checked : parseSpecial(event.target.dataset.bind, event.target.value)); });
   document.addEventListener('click', event => { const module = event.target.closest('[data-module]'); const tab = event.target.closest('[data-tab]'); const add = event.target.closest('[data-add]'); const remove = event.target.closest('[data-remove]'); if (module) selectModule(module.dataset.module); if (tab) { activeTab = tab.dataset.tab; renderTab(); } if (add) addItem(add.dataset.add); if (remove) removeItem(remove.dataset.remove, Number(remove.dataset.index)); });
   $('#loginButton').addEventListener('click', () => { window.location.assign(`${apiBase}/auth/login`); });
   $('#publishButton').addEventListener('click', () => publish().catch(error => notice(error.message, 'error')));
