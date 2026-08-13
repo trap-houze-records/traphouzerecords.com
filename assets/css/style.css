@@ -1121,6 +1121,9 @@ footer p {
 .client-simple-help a { color: #fff; text-decoration: none; }
 .client-simple-help b { color: #16c7f3; font-size: 1.3rem; margin-left: 12px; }
 .booking-section { margin-top: 54px; }
+.booking-time-fields { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin: 20px 0; }
+.booking-time-fields label { color: rgba(255,255,255,.62); display: grid; font-size: .78rem; gap: 7px; }
+.booking-time-fields select { width: 100%; }
 .booking-section-upcoming { margin-top: 0; }
 .booking-section-history { margin-top: 46px; }
 .client-empty { border-top: 1px solid rgba(255,255,255,.15); color: rgba(255,255,255,.48); font-size: .86rem; padding: 18px 0; }

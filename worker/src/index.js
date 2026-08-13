@@ -258,11 +258,18 @@ async function clientAppointment(request, env, appointmentId) {
   const date = bookingDate(body.date);
   const time = bookingTime(body.time);
   const duration = Number(body.duration);
-  if (!Number.isInteger(duration) || duration < 1 || duration > 10) return error('A duração deve estar entre 1 e 10 horas.');
+  if (!Number.isFinite(duration) || duration < 0.5 || duration > 10 || Math.round(duration * 2) !== duration * 2) return error('A duração deve estar entre 30 minutos e 10 horas.');
   if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
   const startsAt = `${date} ${time}`;
   const endsAt = bookingEnd(startsAt, duration);
-  if (endsAt.slice(0, 10) !== date || endsAt.slice(11, 16) > '22:00') return error('Esse horário ultrapassa o período disponível do estúdio.');
+  const content = (await contentFromGitHub(env)).content;
+  const matchedService = bookingServicesFromContent(content).find(item => item.title === current.service);
+  const schedule = bookingScheduleFromContent(content);
+  const rules = schedule.serviceRules[matchedService?.id] || defaultBookingAvailability;
+  const ruleError = bookingBlockedByRules(startsAt, endsAt, rules);
+  if (ruleError) return error(ruleError, 409);
+  if (lisbonInstant(startsAt).getTime() < Date.now() + rules.minNoticeHours * 3600000) return error(`Esta sessão requer pelo menos ${rules.minNoticeHours}h de antecedência.`, 409);
+  if (schedule.blocks.some(item => startsAt < bookingDateTime(item.date, item.endsAt) && endsAt > bookingDateTime(item.date, item.startsAt))) return error('Este período está bloqueado pelo estúdio.', 409);
   const appointment = { ...current, startsAt, endsAt, status: 'pending', notes: String(body.notes || current.notes || '').trim().slice(0, 2000) || null };
   if (await hasAppointmentConflict(db, appointment, appointmentId)) return error('Este horário já não está disponível. Escolha outro, por favor.', 409);
   await db.batch([
@@ -573,12 +580,12 @@ function bookingDate(value) {
 }
 function bookingTime(value) {
   const normalized = String(value || '');
-  if (!/^\d{2}:00$/.test(normalized)) throw inputError('Hora de marcação inválida.');
+  if (!/^\d{2}:(?:00|30)$/.test(normalized)) throw inputError('Hora de marcação inválida.');
   return normalized;
 }
 function bookingEnd(startsAt, hours) {
   const date = new Date(`${startsAt.replace(' ', 'T')}Z`);
-  date.setUTCHours(date.getUTCHours() + hours);
+  date.setTime(date.getTime() + hours * 3600000);
   return date.toISOString().slice(0, 16).replace('T', ' ');
 }
 function isBookableDay(date) {
@@ -619,7 +626,7 @@ async function publicBooking(request, env) {
   const date = bookingDate(body.date);
   const time = bookingTime(body.time);
   const duration = Number(body.duration);
-  if (!Number.isInteger(duration) || duration < 1 || duration > 10) return error('A duração deve ser entre 1 e 10 horas.');
+  if (!Number.isFinite(duration) || duration < 0.5 || duration > 10 || Math.round(duration * 2) !== duration * 2) return error('A duração deve ser entre 30 minutos e 10 horas.');
   if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
   const startsAt = `${date} ${time}`;
   const endsAt = bookingEnd(startsAt, duration);
