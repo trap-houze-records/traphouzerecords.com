@@ -781,6 +781,9 @@ section {
 .artist-links a { border: 1px solid rgba(197,255,92,.55); color: #c5ff5c; font-size: .78rem; padding: 10px 12px; text-decoration: none; }
 .artist-links a:hover { background: #c5ff5c; color: #111; }
 .artist-links a span { margin-left: 7px; }
+.artist-links img { height: 17px; object-fit: contain; width: 17px; }
+.artist-platform-disabled { align-items: center; border: 1px solid rgba(255,255,255,.13); color: rgba(255,255,255,.38); display: inline-flex; font-size: .78rem; gap: 8px; padding: 10px 12px; }
+.artist-platform-disabled img { height: 17px; object-fit: contain; width: 17px; }
 .artist-catalog { display: grid; border-top: 1px solid rgba(255,255,255,.08); }
 .artist-catalog article { align-items: center; border-bottom: 1px solid rgba(255,255,255,.08); display: flex; gap: 18px; justify-content: space-between; padding: 15px 0; }
 .artist-catalog article > div { display: grid; gap: 5px; }
@@ -788,6 +791,8 @@ section {
 .artist-catalog small, .artist-catalog > p { color: rgba(255,255,255,.5); font-size: .74rem; }
 .artist-catalog a { color: #c5ff5c; font-size: .74rem; text-decoration: none; }
 .artist-catalog article > span { color: rgba(255,255,255,.46); font-size: .72rem; }
+.artist-catalog .artist-catalog-playlist { align-items: stretch; display: grid; gap: 12px; padding: 16px 0; }
+.artist-catalog-playlist iframe { border: 0; border-radius: 12px; height: 152px; width: 100%; }
 
 /* ========== AVALIAÇÕES ========== */
 .reviews {

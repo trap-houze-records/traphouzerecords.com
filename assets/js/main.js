@@ -3,6 +3,12 @@ let activeSlide = 0;
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const safeUrl = value => { try { const url = new URL(String(value || '')); return ['https:', 'http:'].includes(url.protocol) ? url.toString() : ''; } catch { return ''; } };
+const artistPlatforms = [['Instagram', 'instagram'], ['YouTube', 'youtube'], ['Spotify', 'spotify'], ['Apple Music', 'applemusic']];
+const spotifyPlaylistEmbed = value => {
+  const url = safeUrl(value);
+  const match = url.match(/^https:\/\/open\.spotify\.com\/playlist\/([A-Za-z0-9]+)(?:\?.*)?$/i);
+  return match ? `https://open.spotify.com/embed/playlist/${match[1]}?utm_source=generator` : '';
+};
 const visibleNav = () => content.navigation.filter(item => item.visible);
 const sectionVisible = id => visibleNav().some(item => item.id === id);
 
@@ -72,9 +78,14 @@ function openBooking(service) {
 function showArtist(index) {
   const artist = content.artists[index];
   const links = Array.isArray(artist.links) ? artist.links : [];
+  const platformLinks = artistPlatforms.map(([label, icon]) => {
+    const link = links.find(item => String(item.label || '').trim().toLowerCase() === label.toLowerCase());
+    const url = safeUrl(link?.url);
+    return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" aria-label="${label} de ${escapeHtml(artist.name)}"><img src="https://cdn.simpleicons.org/${icon}/ffffff" alt="">${label}<span>↗</span></a>` : `<span class="artist-platform-disabled" aria-label="${label} ainda não disponível"><img src="https://cdn.simpleicons.org/${icon}/777777" alt="">${label}</span>`;
+  }).join('');
   const catalog = Array.isArray(artist.catalog) ? artist.catalog : [];
   document.getElementById('artistModalTitle').textContent = artist.name;
-  document.getElementById('artistModalBody').innerHTML = `<div class="artist-modal-profile"><img class="artist-modal-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div><p class="artist-modal-genre">${escapeHtml(artist.genre || 'Artista Trap Houze Records')}</p><p class="artist-modal-bio">${escapeHtml(artist.bio || 'Perfil em atualização.')}</p></div></div><section class="artist-modal-section"><h4>Ligações</h4><div class="artist-links">${links.map(link => safeUrl(link.url) ? `<a href="${escapeHtml(safeUrl(link.url))}" target="_blank" rel="noopener">${escapeHtml(link.label || 'Abrir ligação')} <span>↗</span></a>` : '').join('') || '<p>As ligações deste artista serão disponibilizadas em breve.</p>'}</div></section><section class="artist-modal-section"><h4>Catálogo Trap Houze</h4><div class="artist-catalog">${catalog.map(item => `<article><div><strong>${escapeHtml(item.title || 'Lançamento')}</strong><small>${escapeHtml(item.type || 'Projeto Trap Houze')}</small></div>${safeUrl(item.url) ? `<a href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noopener">Ouvir ↗</a>` : '<span>Em breve</span>'}</article>`).join('') || '<p>Ainda não existem lançamentos publicados no catálogo Trap Houze.</p>'}</div></section>`;
+  document.getElementById('artistModalBody').innerHTML = `<div class="artist-modal-profile"><img class="artist-modal-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div><p class="artist-modal-genre">${escapeHtml(artist.genre || 'Artista Trap Houze Records')}</p><p class="artist-modal-bio">${escapeHtml(artist.bio || 'Perfil em atualização.')}</p></div></div><section class="artist-modal-section"><h4>Ouvir e seguir</h4><div class="artist-links">${platformLinks}</div></section><section class="artist-modal-section"><h4>Catálogo Trap Houze</h4><div class="artist-catalog">${catalog.map(item => { const embed = spotifyPlaylistEmbed(item.url); return embed ? `<article class="artist-catalog-playlist"><div><strong>${escapeHtml(item.title || 'Playlist Spotify')}</strong><small>${escapeHtml(item.type || 'Playlist Spotify')}</small></div><iframe src="${escapeHtml(embed)}" title="Playlist Spotify: ${escapeHtml(item.title || artist.name)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></article>` : `<article><div><strong>${escapeHtml(item.title || 'Lançamento')}</strong><small>${escapeHtml(item.type || 'Projeto Trap Houze')}</small></div>${safeUrl(item.url) ? `<a href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noopener">Ouvir ↗</a>` : '<span>Em breve</span>'}</article>`; }).join('') || '<p>Ainda não existem lançamentos publicados no catálogo Trap Houze.</p>'}</div></section>`;
   const modal = document.getElementById('artistModal');
   modal.classList.add('active'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
 }
