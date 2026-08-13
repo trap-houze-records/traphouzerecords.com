@@ -251,6 +251,257 @@ function paymentUrl(value) {
   if (!value) return null;
   try { const url = new URL(value); if (url.protocol !== 'https:') throw new Error(); return url.toString(); } catch { throw inputError('O link de pagamento deve usar HTTPS.'); }
 }
+function appointmentDate(value, label) {
+  const date = new Date(String(value || ''));
+  if (Number.isNaN(date.getTime())) throw inputError(`${label} inválida.`);
+  return date.toISOString().slice(0, 16).replace('T', ' ');
+}
+function appointmentStatus(value) {
+  if (!['pending', 'confirmed', 'cancelled'].includes(value)) throw inputError('Estado da marcação inválido.');
+  return value;
+}
+async function appointmentPayload(body, db) {
+  const clientId = String(body.clientId || '').trim() || null;
+  const guestName = String(body.guestName || '').trim() || null;
+  const guestPhone = String(body.guestPhone || '').replace(/\D/g, '') || null;
+  const service = String(body.service || '').trim();
+  const startsAt = appointmentDate(body.startsAt, 'Data de início');
+  const endsAt = appointmentDate(body.endsAt, 'Data de fim');
+  const status = appointmentStatus(body.status || 'confirmed');
+  const notes = String(body.notes || '').trim().slice(0, 2000) || null;
+  if (!service || (!clientId && !guestName)) throw inputError('Indique o serviço e um cliente ou contacto.');
+  if (endsAt <= startsAt) throw inputError('A hora de fim deve ser posterior à hora de início.');
+  if (guestPhone && !/^\d{9,15}$/.test(guestPhone)) throw inputError('Número de WhatsApp inválido.');
+  if (clientId && !await db.prepare('SELECT id FROM clients WHERE id = ?').bind(clientId).first()) throw inputError('Cliente não encontrado.');
+  return { clientId, guestName, guestPhone, service, startsAt, endsAt, status, notes };
+}
+async function hasAppointmentConflict(db, appointment, excludeId = '') {
+  if (appointment.status === 'cancelled') return false;
+  const row = await db.prepare("SELECT id FROM studio_appointments WHERE status != 'cancelled' AND starts_at < ? AND ends_at > ? AND id != ? LIMIT 1").bind(appointment.endsAt, appointment.startsAt, excludeId).first();
+  return Boolean(row);
+}
+function googleCalendarConfigured(env) { return Boolean(env.GOOGLE_CALENDAR_CLIENT_ID && env.GOOGLE_CALENDAR_CLIENT_SECRET && env.GOOGLE_CALENDAR_TOKEN_KEY); }
+async function googleCryptoKey(env) {
+  if (!env.GOOGLE_CALENDAR_TOKEN_KEY) throw new Error('Falta configurar GOOGLE_CALENDAR_TOKEN_KEY.');
+  const material = await crypto.subtle.digest('SHA-256', encoder.encode(env.GOOGLE_CALENDAR_TOKEN_KEY));
+  return crypto.subtle.importKey('raw', material, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+async function sealGoogleToken(value, env) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await googleCryptoKey(env), encoder.encode(value));
+  return `${base64Url(iv)}.${base64Url(encrypted)}`;
+}
+async function openGoogleToken(value, env) {
+  const [iv, encrypted] = String(value || '').split('.');
+  if (!iv || !encrypted) throw new Error('A ligação Google Calendar guardada é inválida.');
+  const bytes = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decodeBase64Url(iv) }, await googleCryptoKey(env), decodeBase64Url(encrypted));
+  return decoder.decode(bytes);
+}
+async function googleConnection(env) {
+  const row = await clientDb(env).prepare('SELECT calendar_id AS calendarId, calendar_name AS calendarName, access_token AS accessToken, refresh_token AS refreshToken, expires_at AS expiresAt FROM google_calendar_connection WHERE id = 1').first();
+  if (!row) return null;
+  return { ...row, accessToken: await openGoogleToken(row.accessToken, env), refreshToken: await openGoogleToken(row.refreshToken, env) };
+}
+async function storeGoogleConnection(env, connection) {
+  const db = clientDb(env);
+  await db.prepare('INSERT INTO google_calendar_connection (id, calendar_id, calendar_name, access_token, refresh_token, expires_at, updated_at) VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET calendar_id = excluded.calendar_id, calendar_name = excluded.calendar_name, access_token = excluded.access_token, refresh_token = excluded.refresh_token, expires_at = excluded.expires_at, updated_at = CURRENT_TIMESTAMP').bind(connection.calendarId || null, connection.calendarName || null, await sealGoogleToken(connection.accessToken, env), await sealGoogleToken(connection.refreshToken, env), connection.expiresAt).run();
+}
+async function refreshGoogleConnection(env, current) {
+  const body = new URLSearchParams({ client_id: env.GOOGLE_CALENDAR_CLIENT_ID, client_secret: env.GOOGLE_CALENDAR_CLIENT_SECRET, refresh_token: current.refreshToken, grant_type: 'refresh_token' });
+  const response = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
+  const payload = await response.json();
+  if (!response.ok || !payload.access_token) throw new Error('Não foi possível atualizar a ligação ao Google Calendar.');
+  const refreshed = { ...current, accessToken: payload.access_token, refreshToken: payload.refresh_token || current.refreshToken, expiresAt: new Date(Date.now() + Number(payload.expires_in || 3600) * 1000).toISOString() };
+  await storeGoogleConnection(env, refreshed);
+  return refreshed;
+}
+async function googleApi(env, path, options = {}) {
+  let connection = await googleConnection(env);
+  if (!connection) throw new Error('Ligue primeiro o Google Calendar no painel de administração.');
+  if (new Date(connection.expiresAt).getTime() < Date.now() + 60000) connection = await refreshGoogleConnection(env, connection);
+  const response = await fetch(`https://www.googleapis.com/calendar/v3/${path}`, { ...options, headers: { authorization: `Bearer ${connection.accessToken}`, accept: 'application/json', ...options.headers } });
+  const payload = response.status === 204 ? null : await response.json();
+  if (!response.ok) throw new Error(payload?.error?.message || 'O Google Calendar não respondeu como esperado.');
+  return { connection, payload };
+}
+function googleDateTime(value) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(value)).reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}
+async function googleBusyEvents(env, from, until) {
+  let connection;
+  try { connection = await googleConnection(env); } catch { return []; }
+  if (!connection?.calendarId) return [];
+  const query = new URLSearchParams({ timeMin: new Date(`${from}T00:00:00+01:00`).toISOString(), timeMax: new Date(`${until}T00:00:00+01:00`).toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500' });
+  const { payload } = await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events?${query}`);
+  return (payload.items || []).filter(item => item.status !== 'cancelled' && item.transparency !== 'transparent' && item.start?.dateTime && item.end?.dateTime).map(item => ({ id: item.id, startsAt: googleDateTime(item.start.dateTime), endsAt: googleDateTime(item.end.dateTime), title: item.summary || 'Evento Google Calendar' }));
+}
+async function googleSyncAppointment(env, db, appointment) {
+  let connection;
+  try { connection = await googleConnection(env); } catch { return appointment.googleEventId || null; }
+  if (!connection?.calendarId || appointment.status === 'cancelled') return appointment.googleEventId || null;
+  const client = appointment.clientId ? await db.prepare('SELECT display_name AS name, phone FROM clients WHERE id = ?').bind(appointment.clientId).first() : null;
+  const name = client?.name || appointment.guestName || 'Cliente';
+  const event = { summary: `🎧 ${appointment.service} — ${name}`, description: `Reserva Trap Houze Records\nCliente: ${name}${client?.phone || appointment.guestPhone ? `\nWhatsApp: ${client?.phone || appointment.guestPhone}` : ''}${appointment.notes ? `\nNotas: ${appointment.notes}` : ''}\nEstado: ${appointment.status}`, location: 'Trap Houze Records', start: { dateTime: appointment.startsAt.replace(' ', 'T'), timeZone: 'Europe/Lisbon' }, end: { dateTime: appointment.endsAt.replace(' ', 'T'), timeZone: 'Europe/Lisbon' } };
+  const id = appointment.googleEventId;
+  const result = await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events${id ? `/${encodeURIComponent(id)}` : ''}`, { method: id ? 'PUT' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event) });
+  const googleEventId = result.payload.id;
+  await db.prepare('UPDATE studio_appointments SET google_event_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(googleEventId, appointment.id).run();
+  return googleEventId;
+}
+async function googleDeleteAppointment(env, appointment) {
+  if (!appointment.googleEventId) return;
+  try {
+    const connection = await googleConnection(env);
+    if (connection?.calendarId) await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events/${encodeURIComponent(appointment.googleEventId)}`, { method: 'DELETE' });
+  } catch (caught) { console.warn('Google Calendar: não foi possível apagar evento', caught); }
+}
+async function googleCalendarStatus(request, env) {
+  const admin = await adminSession(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  if (!googleCalendarConfigured(env)) return jsonResponse({ configured: false, connected: false });
+  const connection = await googleConnection(env);
+  return jsonResponse({ configured: true, connected: Boolean(connection), calendarId: connection?.calendarId || '', calendarName: connection?.calendarName || '' });
+}
+async function googleCalendarConnect(request, env) {
+  const admin = await requirePortalAdmin(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  if (!googleCalendarConfigured(env)) return error('A ligação Google Calendar ainda não foi configurada no Worker.', 503);
+  const redirectUri = new URL('/google-calendar/callback', request.url).toString();
+  const state = await signedValue({ role: 'google-calendar', exp: Math.floor(Date.now() / 1000) + 600 }, env);
+  const authorize = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  authorize.search = new URLSearchParams({ client_id: env.GOOGLE_CALENDAR_CLIENT_ID, redirect_uri: redirectUri, response_type: 'code', scope: 'https://www.googleapis.com/auth/calendar', access_type: 'offline', prompt: 'consent', state });
+  return jsonResponse({ url: authorize.toString() });
+}
+async function googleCalendarCallback(request, env) {
+  const url = new URL(request.url);
+  const state = url.searchParams.get('state');
+  if (!state || !(await readSignedValue(state, env))?.role?.includes('google-calendar')) return error('A ligação ao Google Calendar expirou. Tente novamente.', 401);
+  const code = url.searchParams.get('code');
+  if (!code) return error('O Google não devolveu um código de ligação.', 401);
+  const redirectUri = new URL('/google-calendar/callback', request.url).toString();
+  const body = new URLSearchParams({ code, client_id: env.GOOGLE_CALENDAR_CLIENT_ID, client_secret: env.GOOGLE_CALENDAR_CLIENT_SECRET, redirect_uri: redirectUri, grant_type: 'authorization_code' });
+  const response = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
+  const payload = await response.json();
+  if (!response.ok || !payload.access_token || !payload.refresh_token) return error('Não foi possível concluir a ligação ao Google Calendar.', 401);
+  await storeGoogleConnection(env, { accessToken: payload.access_token, refreshToken: payload.refresh_token, calendarId: env.GOOGLE_CALENDAR_DEFAULT_ID || null, calendarName: env.GOOGLE_CALENDAR_DEFAULT_NAME || null, expiresAt: new Date(Date.now() + Number(payload.expires_in || 3600) * 1000).toISOString() });
+  return redirect(`${env.ADMIN_ORIGIN}/admin.html?section=schedule&google=connected`);
+}
+async function googleCalendarCalendars(request, env) {
+  const admin = await adminSession(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  const { payload } = await googleApi(env, 'users/me/calendarList?maxResults=250');
+  return jsonResponse({ calendars: (payload.items || []).map(item => ({ id: item.id, name: item.summary, primary: Boolean(item.primary) })) });
+}
+async function googleCalendarSelect(request, env) {
+  const admin = await requirePortalAdmin(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  let body; try { body = await request.json(); } catch { return error('Pedido inválido.'); }
+  const calendarId = String(body.calendarId || '').trim();
+  const calendarName = String(body.calendarName || '').trim();
+  if (!calendarId || !calendarName) return error('Selecione um calendário Google válido.');
+  const current = await googleConnection(env);
+  if (!current) return error('Ligue primeiro a conta Google.', 409);
+  await storeGoogleConnection(env, { ...current, calendarId, calendarName });
+  return jsonResponse({ ok: true, calendarId, calendarName });
+}
+function bookingDate(value) {
+  const normalized = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized) || Number.isNaN(new Date(`${normalized}T00:00:00Z`).getTime())) throw inputError('Data de marcação inválida.');
+  return normalized;
+}
+function bookingTime(value) {
+  const normalized = String(value || '');
+  if (!/^\d{2}:00$/.test(normalized)) throw inputError('Hora de marcação inválida.');
+  return normalized;
+}
+function bookingEnd(startsAt, hours) {
+  const date = new Date(`${startsAt.replace(' ', 'T')}Z`);
+  date.setUTCHours(date.getUTCHours() + hours);
+  return date.toISOString().slice(0, 16).replace('T', ' ');
+}
+function isBookableDay(date) {
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return weekday >= 2 && weekday <= 6;
+}
+async function publicAvailability(request, env) {
+  const url = new URL(request.url);
+  const from = bookingDate(url.searchParams.get('from'));
+  const until = bookingDate(url.searchParams.get('until'));
+  if (until <= from) throw inputError('Intervalo de disponibilidade inválido.');
+  const busy = await clientDb(env).prepare("SELECT starts_at AS startsAt, ends_at AS endsAt FROM studio_appointments WHERE status != 'cancelled' AND starts_at < ? AND ends_at > ? ORDER BY starts_at ASC").bind(`${until} 00:00`, `${from} 00:00`).all();
+  const googleBusy = await googleBusyEvents(env, from, until);
+  return jsonResponse({ timezone: 'Europe/Lisbon', hours: { startsAt: '10:00', endsAt: '22:00' }, busy: [...busy.results, ...googleBusy] });
+}
+async function publicBooking(request, env) {
+  let body;
+  try { body = await request.json(); } catch { return error('Pedido inválido.'); }
+  const date = bookingDate(body.date);
+  const time = bookingTime(body.time);
+  const duration = Number(body.duration);
+  if (!Number.isInteger(duration) || duration < 1 || duration > 10) return error('A duração deve ser entre 1 e 10 horas.');
+  if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
+  const startsAt = `${date} ${time}`;
+  const endsAt = bookingEnd(startsAt, duration);
+  if (endsAt.slice(0, 10) !== date || endsAt.slice(11, 16) > '22:00') return error('Esse horário ultrapassa o período disponível do estúdio.');
+  const db = clientDb(env);
+  const session = await clientSession(request, env);
+  const sessionClient = session ? await db.prepare('SELECT id, display_name AS name, phone FROM clients WHERE id = ? AND active = 1').bind(session.clientId).first() : null;
+  const guestName = String(body.name || '').trim();
+  const guestPhone = String(body.phone || '').replace(/\D/g, '');
+  const service = String(body.service || 'Sessão de estúdio').trim().slice(0, 160);
+  const notes = String(body.notes || '').trim().slice(0, 2000) || null;
+  if (!sessionClient && (!guestName || !/^\d{9,15}$/.test(guestPhone))) return error('Indique o nome e um WhatsApp válido.');
+  const appointment = { clientId: sessionClient?.id || null, guestName: sessionClient ? null : guestName, guestPhone: sessionClient ? null : guestPhone, service, startsAt, endsAt, status: 'pending', notes };
+  if (await hasAppointmentConflict(db, appointment)) return error('Este horário já não está disponível. Escolha outro, por favor.', 409);
+  const id = randomId();
+  const statements = [db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, service, starts_at, ends_at, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes)];
+  if (sessionClient) {
+    statements.push(db.prepare("INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, 'pending', 0, NULL)").bind(randomId(), sessionClient.id, service, startsAt));
+    statements.push(db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), sessionClient.id, `client:${sessionClient.id}`, 'booking.requested', JSON.stringify({ appointmentId: id, duration })));
+  }
+  await db.batch(statements);
+  googleSyncAppointment(env, db, { id, ...appointment }).catch(caught => console.warn('Google Calendar: reserva criada sem espelho', caught));
+  return jsonResponse({ id, startsAt, endsAt, status: 'pending', client: sessionClient ? { name: sessionClient.name } : null }, 201);
+}
+async function studioSchedule(request, env, appointmentId = '') {
+  const admin = request.method === 'GET' ? await adminSession(request, env) : await requirePortalAdmin(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  const db = clientDb(env);
+  if (request.method === 'GET') {
+    const url = new URL(request.url);
+    const from = appointmentDate(url.searchParams.get('from') || new Date().toISOString(), 'Data inicial');
+    const until = appointmentDate(url.searchParams.get('until') || new Date(Date.now() + 1000 * 60 * 60 * 24 * 31).toISOString(), 'Data final');
+    const appointments = await db.prepare("SELECT a.id, a.client_id AS clientId, COALESCE(c.display_name, a.guest_name) AS clientName, COALESCE(c.phone, a.guest_phone) AS clientPhone, a.service, a.starts_at AS startsAt, a.ends_at AS endsAt, a.status, a.notes, a.google_event_id AS googleEventId, 'studio' AS source FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id WHERE a.starts_at < ? AND a.ends_at > ? ORDER BY a.starts_at ASC").bind(until, from).all();
+    const linkedGoogleIds = new Set(appointments.results.map(item => item.googleEventId).filter(Boolean));
+    const external = (await googleBusyEvents(env, from, until)).filter(item => !linkedGoogleIds.has(item.id)).map(item => ({ id: `google:${item.id}`, clientId: '', clientName: 'Google Calendar', clientPhone: '', service: item.title, startsAt: item.startsAt, endsAt: item.endsAt, status: 'confirmed', notes: 'Evento externo — gerido no Google Calendar.', googleEventId: item.id, source: 'google', readOnly: true }));
+    return jsonResponse({ appointments: [...appointments.results, ...external].sort((a, b) => a.startsAt.localeCompare(b.startsAt)) });
+  }
+  if (request.method === 'DELETE') {
+    const current = await db.prepare('SELECT id, google_event_id AS googleEventId FROM studio_appointments WHERE id = ?').bind(appointmentId).first();
+    if (!current) return error('Marcação não encontrada.', 404);
+    await googleDeleteAppointment(env, current);
+    await db.prepare('DELETE FROM studio_appointments WHERE id = ?').bind(appointmentId).run();
+    return jsonResponse({ ok: true });
+  }
+  let body;
+  try { body = await request.json(); } catch { return error('Pedido inválido.'); }
+  const appointment = await appointmentPayload(body, db);
+  if (await hasAppointmentConflict(db, appointment, appointmentId)) return error('Este horário entra em conflito com outra marcação.', 409);
+  const id = appointmentId || randomId();
+  if (appointmentId) {
+    const current = await db.prepare('SELECT id FROM studio_appointments WHERE id = ?').bind(id).first();
+    if (!current) return error('Marcação não encontrada.', 404);
+    await db.prepare('UPDATE studio_appointments SET client_id = ?, guest_name = ?, guest_phone = ?, service = ?, starts_at = ?, ends_at = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes, id).run();
+  } else {
+    await db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, service, starts_at, ends_at, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes).run();
+  }
+  const currentGoogle = appointmentId ? await db.prepare('SELECT google_event_id AS googleEventId FROM studio_appointments WHERE id = ?').bind(id).first() : null;
+  const synced = { id, ...appointment, googleEventId: currentGoogle?.googleEventId || '' };
+  if (appointment.status === 'cancelled') await googleDeleteAppointment(env, synced);
+  else googleSyncAppointment(env, db, synced).catch(caught => console.warn('Google Calendar: marcação guardada sem espelho', caught));
+  return jsonResponse(synced, appointmentId ? 200 : 201);
+}
 async function portalAdminMutation(request, env, resource, id) {
   const admin = await requirePortalAdmin(request, env);
   if (!admin) return error('Pedido de administração não autorizado.', 403);
@@ -334,9 +585,19 @@ export default {
       else if (url.pathname === '/client/auth/login' && request.method === 'POST') response = await clientLogin(request, env);
       else if (url.pathname === '/client/auth/logout' && request.method === 'POST') response = await clientLogout(request, env);
       else if (url.pathname === '/client/portal' && request.method === 'GET') response = await clientPortal(request, env);
+      else if (url.pathname === '/google-calendar/status' && request.method === 'GET') response = await googleCalendarStatus(request, env);
+      else if (url.pathname === '/google-calendar/connect' && request.method === 'POST') response = await googleCalendarConnect(request, env);
+      else if (url.pathname === '/google-calendar/callback' && request.method === 'GET') response = await googleCalendarCallback(request, env);
+      else if (url.pathname === '/google-calendar/calendars' && request.method === 'GET') response = await googleCalendarCalendars(request, env);
+      else if (url.pathname === '/google-calendar/calendar' && request.method === 'PATCH') response = await googleCalendarSelect(request, env);
+      else if (url.pathname === '/studio/availability' && request.method === 'GET') response = await publicAvailability(request, env);
+      else if (url.pathname === '/studio/booking' && request.method === 'POST') response = await publicBooking(request, env);
       else if (url.pathname === '/client/admin/clients' && request.method === 'GET') response = await portalAdminClients(request, env);
       else if (url.pathname === '/client/admin/clients' && request.method === 'POST') response = await portalCreateClient(request, env);
       else if (/^\/client\/admin\/clients\/[0-9a-f-]{36}$/i.test(url.pathname) && request.method === 'GET') response = await portalAdminClient(request, env, url.pathname.split('/').pop());
+      else if (url.pathname === '/studio/appointments' && request.method === 'GET') response = await studioSchedule(request, env);
+      else if (url.pathname === '/studio/appointments' && request.method === 'POST') response = await studioSchedule(request, env);
+      else if (/^\/studio\/appointments\/[0-9a-f-]{36}$/i.test(url.pathname) && ['PATCH', 'DELETE'].includes(request.method)) response = await studioSchedule(request, env, url.pathname.split('/').pop());
       else {
         const match = url.pathname.match(/^\/client\/admin\/(clients|tracks|bookings)\/([0-9a-f-]{36})$/i);
         if (match && ['PATCH', 'POST', 'DELETE'].includes(request.method)) response = await portalAdminMutation(request, env, match[1], match[2]);

@@ -51,6 +51,38 @@ CREATE TABLE client_bookings (
 
 CREATE INDEX client_bookings_client_id ON client_bookings(client_id);
 
+CREATE TABLE studio_appointments (
+  id TEXT PRIMARY KEY,
+  client_id TEXT REFERENCES clients(id) ON DELETE SET NULL,
+  guest_name TEXT,
+  guest_phone TEXT,
+  service TEXT NOT NULL,
+  starts_at TEXT NOT NULL,
+  ends_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'cancelled')),
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CHECK (ends_at > starts_at),
+  CHECK (client_id IS NOT NULL OR guest_name IS NOT NULL)
+);
+
+CREATE INDEX studio_appointments_starts_at ON studio_appointments(starts_at);
+CREATE INDEX studio_appointments_client_id ON studio_appointments(client_id);
+
+CREATE TABLE google_calendar_connection (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  calendar_id TEXT,
+  calendar_name TEXT,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE studio_appointments ADD COLUMN google_event_id TEXT;
+CREATE UNIQUE INDEX studio_appointments_google_event_id ON studio_appointments(google_event_id) WHERE google_event_id IS NOT NULL;
+
 CREATE TABLE client_audit_log (
   id TEXT PRIMARY KEY,
   client_id TEXT REFERENCES clients(id) ON DELETE SET NULL,

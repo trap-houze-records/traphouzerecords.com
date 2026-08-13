@@ -13,6 +13,8 @@ CONTENT_PATH = "data/site.json"
 ALLOWED_GITHUB_USERS = "trap-houze-records"
 # ID da instalação da GitHub App neste repositório.
 GITHUB_INSTALLATION_ID = "153174915"
+GOOGLE_CALENDAR_DEFAULT_ID = "bab49f46fa47e6fb7a9ffc1fe4ec50ccf2922a6775ffc14891d2bafe2d053537@group.calendar.google.com"
+GOOGLE_CALENDAR_DEFAULT_NAME = "Booking"
 
 [[d1_databases]]
 binding = "CLIENT_PORTAL_DB"

@@ -1,13 +1,24 @@
 let draft;
 let contentLoaded = false;
 let activeTab = 'site';
-let activeModule = new URLSearchParams(location.search).get('section') === 'clients' ? 'clients' : (sessionStorage.getItem('th_admin_requested_module') || 'dashboard');
+const requestedModule = new URLSearchParams(location.search).get('section');
+let activeModule = ['clients', 'schedule'].includes(requestedModule) ? requestedModule : (sessionStorage.getItem('th_admin_requested_module') || 'dashboard');
 let csrfToken = '';
 let sessionToken = sessionStorage.getItem('th_cms_session') || '';
 const apiBase = (window.CMS_API_URL || '').replace(/\/$/, '');
 const isLocalPreview = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const tabs = [['site', 'Identidade'], ['menu', 'Menu'], ['hero', 'Destaques'], ['services', 'Serviços'], ['equipment', 'Equipamento'], ['about', 'Quem somos'], ['artists', 'Artistas'], ['reviews', 'Avaliações']];
-const modules = [['dashboard', 'Dashboard'], ['site', 'Editar site'], ['clients', 'Clientes']];
+const editorMeta = {
+  site: ['Identidade do estúdio', 'Os dados base que aparecem no site, contactos e ligação de agendamento.'],
+  menu: ['Navegação', 'Controla as secções disponíveis no menu e no site público.'],
+  hero: ['Destaques', 'Define as imagens e mensagens principais da primeira secção do site.'],
+  services: ['Serviços', 'Apresenta serviços, respetivas descrições e a ação de cada botão.'],
+  equipment: ['Equipamento', 'Mantém a lista de equipamento e as galerias apresentadas no site.'],
+  about: ['Quem somos', 'Edita a apresentação do estúdio, imagem e indicadores principais.'],
+  artists: ['Artistas', 'Gere os artistas ou colaboradores apresentados no site.'],
+  reviews: ['Avaliações', 'Edita os testemunhos que reforçam a confiança no estúdio.']
+};
+const modules = [['dashboard', 'Dashboard'], ['site', 'Editar site'], ['schedule', 'Agenda'], ['clients', 'Clientes']];
 const $ = selector => document.querySelector(selector);
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const field = (label, path, value, type = 'text') => `<label class="admin-field"><span>${label}</span>${type === 'textarea' ? `<textarea data-bind="${path}" rows="4">${escapeHtml(value || '')}</textarea>` : `<input type="${type}" data-bind="${path}" value="${escapeHtml(value || '')}">`}</label>`;
@@ -31,7 +42,8 @@ function renderTab() {
     artists: renderArtists,
     reviews: renderReviews
   }[activeTab];
-  $('#adminContent').innerHTML = section();
+  const [title, description] = editorMeta[activeTab];
+  $('#adminContent').innerHTML = `<section class="studio-editor"><header class="studio-editor-heading"><div><p class="eyebrow">Edição do site</p><h2>${title}</h2><p>${description}</p></div><div class="studio-editor-state"><span>Rascunho</span><small>Publica quando estiver pronto.</small></div></header><div class="studio-editor-body">${section()}</div></section>`;
 }
 
 function renderSite() { const site = draft.site; return `<section class="admin-grid">${card('Dados gerais', [field('Nome', 'site.name', site.name), field('Subtítulo', 'site.tagline', site.tagline), field('Localização', 'site.location', site.location), field('E-mail', 'site.email', site.email), field('URL Instagram', 'site.instagram', site.instagram), field('Nome no Instagram', 'site.instagramHandle', site.instagramHandle), field('WhatsApp (só algarismos)', 'site.whatsapp', site.whatsapp), field('URL de agendamento', 'site.bookingUrl', site.bookingUrl), field('Horário', 'site.hours', site.hours)].join(''))}</section>`; }
@@ -79,7 +91,7 @@ function renderModules() {
 function renderDashboard() {
   $('#adminTabs').hidden = true;
   $('#publishButton').hidden = true;
-  $('#adminContent').innerHTML = `<section class="studio-dashboard"><header class="studio-dashboard-heading"><div><p class="eyebrow">Visão operacional</p><h2>Hoje no estúdio</h2><p>O essencial do dia, sem distrações.</p></div><span class="studio-live">Sistema ativo</span></header><div class="studio-stats"><article><span>Clientes ativos</span><strong id="dashboardClientCount">—</strong><small>na Área do Cliente</small></article><article><span>Trabalhos pendentes</span><strong>—</strong><small>Em breve</small></article><article><span>Reservas</span><strong>—</strong><small>Em breve</small></article><article><span>Pagamentos pendentes</span><strong>—</strong><small>Em breve</small></article></div><div class="studio-dashboard-grid"><section class="studio-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Começar</p><h3>Gestão do estúdio</h3></div></div><button type="button" class="studio-action" data-module="clients"><span>01</span><div><strong>Gerir clientes</strong><small>Contas, músicas, reservas e pagamentos.</small></div><b>→</b></button><button type="button" class="studio-action" data-module="site"><span>02</span><div><strong>Editar site</strong><small>Conteúdos, navegação e publicação.</small></div><b>→</b></button></section><section class="studio-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Próximas funções</p><h3>Em preparação</h3></div></div><ul class="studio-roadmap"><li><span>Agenda interna</span><small>Reservas e disponibilidade do estúdio.</small></li><li><span>Resumo financeiro</span><small>Pagamentos, faturação e valores em falta.</small></li><li><span>Atividade recente</span><small>Histórico centralizado do estúdio.</small></li></ul></section></div></section>`;
+  $('#adminContent').innerHTML = `<section class="studio-dashboard"><header class="studio-dashboard-heading"><div><p class="eyebrow">Visão operacional</p><h2>Hoje no estúdio</h2><p>O essencial do dia, sem distrações.</p></div><span class="studio-live">Sistema ativo</span></header><div class="studio-stats"><article><span>Clientes ativos</span><strong id="dashboardClientCount">—</strong><small>na Área do Cliente</small></article><article><span>Trabalhos pendentes</span><strong>—</strong><small>Em breve</small></article><article><span>Reservas</span><strong>—</strong><small>Gerir na agenda</small></article><article><span>Pagamentos pendentes</span><strong>—</strong><small>Em breve</small></article></div><div class="studio-dashboard-grid"><section class="studio-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Começar</p><h3>Gestão do estúdio</h3></div></div><button type="button" class="studio-action" data-module="schedule"><span>01</span><div><strong>Abrir agenda</strong><small>Marcações, horários e disponibilidade.</small></div><b>→</b></button><button type="button" class="studio-action" data-module="clients"><span>02</span><div><strong>Gerir clientes</strong><small>Contas, músicas, reservas e pagamentos.</small></div><b>→</b></button><button type="button" class="studio-action" data-module="site"><span>03</span><div><strong>Editar site</strong><small>Conteúdos, navegação e publicação.</small></div><b>→</b></button></section><section class="studio-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Próximas funções</p><h3>Em preparação</h3></div></div><ul class="studio-roadmap"><li><span>Reservas públicas</span><small>Substituição gradual do TidyCal pela agenda própria.</small></li><li><span>Resumo financeiro</span><small>Pagamentos, faturação e valores em falta.</small></li><li><span>Atividade recente</span><small>Histórico centralizado do estúdio.</small></li></ul></section></div></section>`;
   fetch(`${apiBase}/client/admin/clients`, { headers: { Authorization: `Bearer ${sessionToken}` } }).then(response => response.ok ? response.json() : null).then(result => { const count = $('#dashboardClientCount'); if (count) count.textContent = result ? result.clients.filter(client => client.active).length : '—'; }).catch(() => {});
 }
 function renderClients() {
@@ -88,13 +100,20 @@ function renderClients() {
   $('#adminContent').innerHTML = '<div id="clientModuleRoot"></div>';
   window.ClientAdminModule.mount($('#clientModuleRoot'), { apiBase, getToken: () => sessionToken, getCsrf: () => csrfToken, onError: error => notice(error.message, 'error'), onNotice: notice }).catch(error => notice(error.message, 'error'));
 }
+function renderSchedule() {
+  $('#adminTabs').hidden = true;
+  $('#publishButton').hidden = true;
+  $('#adminContent').innerHTML = '<div id="scheduleModuleRoot"></div>';
+  window.StudioScheduleModule.mount($('#scheduleModuleRoot'), { apiBase, getToken: () => sessionToken, getCsrf: () => csrfToken, onError: error => notice(error.message, 'error'), onNotice: notice }).catch(error => notice(error.message, 'error'));
+}
 function selectModule(module) {
   activeModule = module;
   sessionStorage.setItem('th_admin_requested_module', module);
-  history.replaceState(null, '', `${location.pathname}${module === 'clients' ? '?section=clients' : ''}`);
+  history.replaceState(null, '', `${location.pathname}${['clients', 'schedule'].includes(module) ? `?section=${module}` : ''}`);
   renderModules();
   if (module === 'dashboard') return renderDashboard();
   if (module === 'clients') return renderClients();
+  if (module === 'schedule') return renderSchedule();
   $('#adminTabs').hidden = false;
   $('#publishButton').hidden = isLocalPreview;
   if (contentLoaded) return renderTab();

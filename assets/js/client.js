@@ -47,7 +47,9 @@ function renderTrack(track) {
 }
 
 function renderBooking(booking) {
-  return `<article class="booking-row"><time>${escapeHtml(booking.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(booking.time || '')}</p></div><div class="booking-payment ${booking.paid ? 'paid' : 'pending'}">${booking.paid ? '<span>Pago ✓</span>' : `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">Pagar ${money(booking.amount)}</button>`}</div></article>`;
+  const hasAmount = Number(booking.amount || 0) > 0;
+  const payment = booking.paid ? '<span>Pago ✓</span>' : hasAmount ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">Pagar ${money(booking.amount)}</button>` : '<span class="booking-payment-unset">Pagamento a definir</span>';
+  return `<article class="booking-row"><time>${escapeHtml(booking.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(booking.time || '')}</p></div><div class="booking-payment ${booking.paid ? 'paid' : 'pending'}">${payment}</div></article>`;
 }
 
 const portal = document.getElementById('clientPortal');
@@ -56,7 +58,7 @@ function renderPortal() {
 const outstanding = [...clientData.tracks, ...clientData.bookings].filter(item => !item.paid).reduce((total, item) => total + Number(item.amount || 0), 0);
 const portalNote = apiBase ? 'Área privada · acesso protegido por credenciais.' : 'Protótipo local · o acesso real de cada cliente será ligado numa fase seguinte.';
 portal.innerHTML = `<div class="client-shell client-simple">
-  <header class="client-header"><a class="client-brand" href="index.html" aria-label="Trap Houze Records"><img src="images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div class="client-user"><span>Olá, ${escapeHtml(clientData.client)}</span><button class="client-signout" type="button">Sair</button></div></header>
+  <header class="client-header"><a class="client-brand" href="index.html" aria-label="Trap Houze Records"><img src="images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div class="client-user"><span>Olá, ${escapeHtml(clientData.client)}</span>${apiBase ? '<a class="client-book-session" href="booking.html">Agendar sessão</a>' : ''}<button class="client-signout" type="button">Sair</button></div></header>
   <section class="client-simple-hero"><p class="eyebrow">O teu trabalho</p><h1>As tuas músicas</h1><p>Acompanha o estado de cada faixa e os pagamentos associados.</p>${outstanding ? `<div class="client-total-due"><span>Total em falta</span><strong>${money(outstanding)}</strong></div>` : ''}</section>
   <section class="track-list">${clientData.tracks.map(renderTrack).join('')}</section>
   <section class="booking-section"><div class="booking-section-heading"><div><p class="eyebrow">Estúdio</p><h2>Reservas</h2></div><span>${clientData.bookings.length} registadas</span></div><div class="booking-list">${clientData.bookings.map(renderBooking).join('')}</div></section>
