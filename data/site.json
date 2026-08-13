@@ -34,7 +34,7 @@
     {
       "id": "artists",
       "label": "Artistas",
-      "visible": false
+      "visible": true
     },
     {
       "id": "reviews",
@@ -151,7 +151,21 @@
     {
       "name": "Abtonas",
       "genre": "Artista",
-      "image": "https://www.image2url.com/r2/default/files/1786545657212-aef7a884-e21e-430a-9101-92751c8f2ac6.jpeg"
+      "image": "https://www.image2url.com/r2/default/files/1786545657212-aef7a884-e21e-430a-9101-92751c8f2ac6.jpeg",
+      "links": [
+        {
+          "label": "Spotify",
+          "url": "https://open.spotify.com/artist/76BaVKSpZXsjpkpmY9ZVK2?si=1UUGN4hkR0iE4aOSi-AsyA&utm_source=copy-link"
+        }
+      ],
+      "bio": "Supa Boy",
+      "catalog": [
+        {
+          "title": "MONEY WALK",
+          "type": "SINGLE",
+          "url": "https://open.spotify.com/track/1HqPKHlETQ8SYfCNHVncJA?si=-28AN1-hS_mZ43nrvT5q0Q&utm_source=copy-link"
+        }
+      ]
     },
     {
       "name": "Gleo",
