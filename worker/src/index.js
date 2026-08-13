@@ -280,7 +280,9 @@ async function hasAppointmentConflict(db, appointment, excludeId = '') {
   const row = await db.prepare("SELECT id FROM studio_appointments WHERE status != 'cancelled' AND starts_at < ? AND ends_at > ? AND id != ? LIMIT 1").bind(appointment.endsAt, appointment.startsAt, excludeId).first();
   return Boolean(row);
 }
-function googleCalendarConfigured(env) { return Boolean(env.GOOGLE_CALENDAR_CLIENT_ID && env.GOOGLE_CALENDAR_CLIENT_SECRET && env.GOOGLE_CALENDAR_TOKEN_KEY); }
+function googleServiceConfigured(env) { return Boolean(env.GOOGLE_SERVICE_ACCOUNT_EMAIL && env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY && env.GOOGLE_CALENDAR_DEFAULT_ID); }
+function googleOAuthConfigured(env) { return Boolean(env.GOOGLE_CALENDAR_CLIENT_ID && env.GOOGLE_CALENDAR_CLIENT_SECRET && env.GOOGLE_CALENDAR_TOKEN_KEY); }
+function googleCalendarConfigured(env) { return googleServiceConfigured(env) || googleOAuthConfigured(env); }
 async function googleCryptoKey(env) {
   if (!env.GOOGLE_CALENDAR_TOKEN_KEY) throw new Error('Falta configurar GOOGLE_CALENDAR_TOKEN_KEY.');
   const material = await crypto.subtle.digest('SHA-256', encoder.encode(env.GOOGLE_CALENDAR_TOKEN_KEY));
@@ -315,11 +317,26 @@ async function refreshGoogleConnection(env, current) {
   await storeGoogleConnection(env, refreshed);
   return refreshed;
 }
+async function googleServiceAccessToken(env) {
+  const now = Math.floor(Date.now() / 1000);
+  const unsigned = `${base64UrlText(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${base64UrlText(JSON.stringify({ iss: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, scope: 'https://www.googleapis.com/auth/calendar', aud: 'https://oauth2.googleapis.com/token', iat: now - 30, exp: now + 3300 }))}`;
+  const privateKey = String(env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY).replace(/\\n/g, '\n');
+  const key = await crypto.subtle.importKey('pkcs8', pemToBuffer(privateKey).buffer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const assertion = `${unsigned}.${base64Url(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, encoder.encode(unsigned)))}`;
+  const response = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }) });
+  const payload = await response.json();
+  if (!response.ok || !payload.access_token) throw new Error(payload?.error_description || 'Não foi possível autenticar a conta de serviço Google.');
+  return payload.access_token;
+}
+async function activeGoogleConnection(env) {
+  if (googleServiceConfigured(env)) return { calendarId: env.GOOGLE_CALENDAR_DEFAULT_ID, calendarName: env.GOOGLE_CALENDAR_DEFAULT_NAME || 'Booking', serviceAccount: true };
+  return googleConnection(env);
+}
 async function googleApi(env, path, options = {}) {
-  let connection = await googleConnection(env);
+  let connection = await activeGoogleConnection(env);
   if (!connection) throw new Error('Ligue primeiro o Google Calendar no painel de administração.');
-  if (new Date(connection.expiresAt).getTime() < Date.now() + 60000) connection = await refreshGoogleConnection(env, connection);
-  const response = await fetch(`https://www.googleapis.com/calendar/v3/${path}`, { ...options, headers: { authorization: `Bearer ${connection.accessToken}`, accept: 'application/json', ...options.headers } });
+  const accessToken = connection.serviceAccount ? await googleServiceAccessToken(env) : (new Date(connection.expiresAt).getTime() < Date.now() + 60000 ? (connection = await refreshGoogleConnection(env, connection)).accessToken : connection.accessToken);
+  const response = await fetch(`https://www.googleapis.com/calendar/v3/${path}`, { ...options, headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json', ...options.headers } });
   const payload = response.status === 204 ? null : await response.json();
   if (!response.ok) throw new Error(payload?.error?.message || 'O Google Calendar não respondeu como esperado.');
   return { connection, payload };
@@ -330,7 +347,7 @@ function googleDateTime(value) {
 }
 async function googleBusyEvents(env, from, until) {
   let connection;
-  try { connection = await googleConnection(env); } catch { return []; }
+  try { connection = await activeGoogleConnection(env); } catch { return []; }
   if (!connection?.calendarId) return [];
   const query = new URLSearchParams({ timeMin: new Date(`${from}T00:00:00+01:00`).toISOString(), timeMax: new Date(`${until}T00:00:00+01:00`).toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500' });
   const { payload } = await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events?${query}`);
@@ -338,7 +355,7 @@ async function googleBusyEvents(env, from, until) {
 }
 async function googleSyncAppointment(env, db, appointment) {
   let connection;
-  try { connection = await googleConnection(env); } catch { return appointment.googleEventId || null; }
+  try { connection = await activeGoogleConnection(env); } catch { return appointment.googleEventId || null; }
   if (!connection?.calendarId || appointment.status === 'cancelled') return appointment.googleEventId || null;
   const client = appointment.clientId ? await db.prepare('SELECT display_name AS name, phone FROM clients WHERE id = ?').bind(appointment.clientId).first() : null;
   const name = client?.name || appointment.guestName || 'Cliente';
@@ -352,7 +369,7 @@ async function googleSyncAppointment(env, db, appointment) {
 async function googleDeleteAppointment(env, appointment) {
   if (!appointment.googleEventId) return;
   try {
-    const connection = await googleConnection(env);
+    const connection = await activeGoogleConnection(env);
     if (connection?.calendarId) await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events/${encodeURIComponent(appointment.googleEventId)}`, { method: 'DELETE' });
   } catch (caught) { console.warn('Google Calendar: não foi possível apagar evento', caught); }
 }
@@ -360,12 +377,13 @@ async function googleCalendarStatus(request, env) {
   const admin = await adminSession(request, env);
   if (!admin) return error('Pedido de administração não autorizado.', 403);
   if (!googleCalendarConfigured(env)) return jsonResponse({ configured: false, connected: false });
-  const connection = await googleConnection(env);
-  return jsonResponse({ configured: true, connected: Boolean(connection), calendarId: connection?.calendarId || '', calendarName: connection?.calendarName || '' });
+  const connection = await activeGoogleConnection(env);
+  return jsonResponse({ configured: true, connected: Boolean(connection), calendarId: connection?.calendarId || '', calendarName: connection?.calendarName || '', serviceAccount: Boolean(connection?.serviceAccount) });
 }
 async function googleCalendarConnect(request, env) {
   const admin = await requirePortalAdmin(request, env);
   if (!admin) return error('Pedido de administração não autorizado.', 403);
+  if (googleServiceConfigured(env)) return jsonResponse({ connected: true, message: 'A agenda Booking está ligada através da conta de serviço.' });
   if (!googleCalendarConfigured(env)) return error('A ligação Google Calendar ainda não foi configurada no Worker.', 503);
   const redirectUri = new URL('/google-calendar/callback', request.url).toString();
   const state = await signedValue({ role: 'google-calendar', exp: Math.floor(Date.now() / 1000) + 600 }, env);
@@ -390,6 +408,7 @@ async function googleCalendarCallback(request, env) {
 async function googleCalendarCalendars(request, env) {
   const admin = await adminSession(request, env);
   if (!admin) return error('Pedido de administração não autorizado.', 403);
+  if (googleServiceConfigured(env)) return jsonResponse({ calendars: [{ id: env.GOOGLE_CALENDAR_DEFAULT_ID, name: env.GOOGLE_CALENDAR_DEFAULT_NAME || 'Booking', primary: false }] });
   const { payload } = await googleApi(env, 'users/me/calendarList?maxResults=250');
   return jsonResponse({ calendars: (payload.items || []).map(item => ({ id: item.id, name: item.summary, primary: Boolean(item.primary) })) });
 }
@@ -400,6 +419,7 @@ async function googleCalendarSelect(request, env) {
   const calendarId = String(body.calendarId || '').trim();
   const calendarName = String(body.calendarName || '').trim();
   if (!calendarId || !calendarName) return error('Selecione um calendário Google válido.');
+  if (googleServiceConfigured(env)) return error('O calendário Booking é gerido pela conta de serviço.', 409);
   const current = await googleConnection(env);
   if (!current) return error('Ligue primeiro a conta Google.', 409);
   await storeGoogleConnection(env, { ...current, calendarId, calendarName });

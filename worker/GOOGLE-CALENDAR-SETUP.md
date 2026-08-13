@@ -4,24 +4,22 @@ O site usa exclusivamente o calendário **Booking**:
 
 `bab49f46fa47e6fb7a9ffc1fe4ec50ccf2922a6775ffc14891d2bafe2d053537@group.calendar.google.com`
 
-## Configuração única antes do deploy
+## Configuração ativa: conta de serviço
 
 1. Na Google Cloud Console, criar ou selecionar o projeto da Trap Houze.
 2. Ativar **Google Calendar API**.
-3. Configurar o ecrã de consentimento OAuth para a conta `traphouzerec@gmail.com`.
-4. Criar credenciais **OAuth Client ID → Web application**.
-5. Adicionar este redirect URI:
+3. Criar uma conta de serviço chamada **Trap Houze Booking Calendar**.
+4. Criar uma chave JSON para essa conta de serviço e guardar no Cloudflare Worker, apenas como secret:
 
-   `https://trap-houze-cms.traphouzerec.workers.dev/google-calendar/callback`
+   - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+   - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` — o valor completo de `private_key` da chave JSON.
 
-6. No Worker Cloudflare, guardar estes secrets:
+5. No Google Calendar, abrir as definições do calendário **Booking** e partilhá-lo com:
 
-   - `GOOGLE_CALENDAR_CLIENT_ID`
-   - `GOOGLE_CALENDAR_CLIENT_SECRET`
-   - `GOOGLE_CALENDAR_TOKEN_KEY` — frase aleatória longa, exclusiva desta integração.
+   `trap-houze-booking-calendar@trap-houze-records.iam.gserviceaccount.com`
 
-## Ligação da conta
+   com a permissão **Fazer alterações a eventos**.
 
-Depois de publicar o Worker e abrir `/admin.html?section=schedule`, carregar em **Ligar conta Google** e autorizar `traphouzerec@gmail.com`.
+Não há nenhuma autenticação OAuth para fazer no painel. A conta de serviço dá acesso somente ao calendário Booking que foi partilhado com ela.
 
 As novas reservas são espelhadas no calendário Booking; eventos criados diretamente nesse calendário bloqueiam disponibilidade no site e aparecem na Agenda do Admin como eventos externos.
