@@ -351,7 +351,9 @@ async function googleBusyEvents(env, from, until) {
   let connection;
   try { connection = await activeGoogleConnection(env); } catch { return []; }
   if (!connection?.calendarId) return [];
-  const query = new URLSearchParams({ timeMin: new Date(`${from}T00:00:00+01:00`).toISOString(), timeMax: new Date(`${until}T00:00:00+01:00`).toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500' });
+  const fromDay = String(from).slice(0, 10);
+  const untilDay = String(until).slice(0, 10);
+  const query = new URLSearchParams({ timeMin: new Date(`${fromDay}T00:00:00+01:00`).toISOString(), timeMax: new Date(`${untilDay}T00:00:00+01:00`).toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500' });
   const { payload } = await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events?${query}`);
   return (payload.items || []).filter(item => item.status !== 'cancelled' && item.transparency !== 'transparent' && item.start?.dateTime && item.end?.dateTime).map(item => {
     const startsAt = googleDateTime(item.start.dateTime);
