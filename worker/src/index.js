@@ -102,7 +102,7 @@ const defaultBookingServices = [
   { id: 'studio-art-direction', title: 'Sessão de Estúdio (Captação com engenheiro + Direção Artística)', pricePerHour: 30, active: true },
   { id: 'studio-rental', title: 'Alugar o Estúdio', pricePerHour: 10, active: true }
 ];
-const defaultBookingAvailability = { startsAt: '10:00', endsAt: '22:00', lunchStartsAt: '13:00', lunchEndsAt: '14:00', minNoticeHours: 24 };
+const defaultBookingAvailability = { startsAt: '10:00', endsAt: '22:00', lunchStartsAt: '13:00', lunchEndsAt: '14:00', lunchEnabled: true, minNoticeHours: 24 };
 function bookingScheduleFromContent(content) {
   const raw = content?.bookingSchedule && typeof content.bookingSchedule === 'object' ? content.bookingSchedule : {};
   const serviceRules = raw.serviceRules && typeof raw.serviceRules === 'object' ? raw.serviceRules : {};
@@ -114,7 +114,7 @@ function bookingScheduleFromContent(content) {
     const endsAt = validTime(source.endsAt) || defaultBookingAvailability.endsAt;
     const lunchStartsAt = validTime(source.lunchStartsAt) || defaultBookingAvailability.lunchStartsAt;
     const lunchEndsAt = validTime(source.lunchEndsAt) || defaultBookingAvailability.lunchEndsAt;
-    return { startsAt, endsAt, lunchStartsAt, lunchEndsAt, minNoticeHours: Math.max(0, Math.min(720, Number(source.minNoticeHours ?? defaultBookingAvailability.minNoticeHours) || 0)) };
+    return { startsAt, endsAt, lunchStartsAt, lunchEndsAt, lunchEnabled: source.lunchEnabled !== undefined ? source.lunchEnabled !== false : item.id !== 'studio-rental', minNoticeHours: Math.max(0, Math.min(720, Number(source.minNoticeHours ?? defaultBookingAvailability.minNoticeHours) || 0)) };
   };
   return { serviceRules: Object.fromEntries(bookingServicesFromContent(content).map(item => [item.id, rule(item)])), blocks: blocks.map((item, index) => ({ id: String(item.id || `block-${index + 1}`), date: String(item.date || ''), startsAt: validTime(item.startsAt), endsAt: validTime(item.endsAt), label: String(item.label || 'Bloqueio').trim().slice(0, 120) })).filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.startsAt && item.endsAt && item.endsAt > item.startsAt) };
 }
@@ -258,7 +258,7 @@ async function clientAppointment(request, env, appointmentId) {
   const date = bookingDate(body.date);
   const time = bookingTime(body.time);
   const duration = Number(body.duration);
-  if (!Number.isFinite(duration) || duration < 0.5 || duration > 10 || Math.round(duration * 2) !== duration * 2) return error('A duração deve estar entre 30 minutos e 10 horas.');
+  if (!Number.isInteger(duration) || duration < 1 || duration > 10) return error('A duração deve estar entre 1 e 10 horas.');
   if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
   const startsAt = `${date} ${time}`;
   const endsAt = bookingEnd(startsAt, duration);
@@ -598,7 +598,7 @@ function bookingBlockedByRules(startsAt, endsAt, rules) {
   const startTime = startsAt.slice(11, 16);
   const endTime = endsAt.slice(11, 16);
   if (endsAt.slice(0, 10) !== date || startTime < rules.startsAt || endTime > rules.endsAt) return 'Esse horário está fora do período disponível para esta sessão.';
-  if (startTime < rules.lunchEndsAt && endTime > rules.lunchStartsAt) return 'Esse horário inclui a pausa de almoço.';
+  if (rules.lunchEnabled && startTime < rules.lunchEndsAt && endTime > rules.lunchStartsAt) return 'Esse horário inclui a pausa de almoço.';
   return '';
 }
 function lisbonInstant(localValue) {
@@ -626,7 +626,7 @@ async function publicBooking(request, env) {
   const date = bookingDate(body.date);
   const time = bookingTime(body.time);
   const duration = Number(body.duration);
-  if (!Number.isFinite(duration) || duration < 0.5 || duration > 10 || Math.round(duration * 2) !== duration * 2) return error('A duração deve ser entre 30 minutos e 10 horas.');
+  if (!Number.isInteger(duration) || duration < 1 || duration > 10) return error('A duração deve ser entre 1 e 10 horas.');
   if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
   const startsAt = `${date} ${time}`;
   const endsAt = bookingEnd(startsAt, duration);
