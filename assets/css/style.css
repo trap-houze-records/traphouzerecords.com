@@ -1083,6 +1083,7 @@ footer p {
 .booking-row p { margin-top: 5px; color: rgba(255,255,255,.5); font-size: .86rem; }
 .booking-payment span { color: #c5ff5c; font-size: .82rem; }
 .booking-payment button { border: 1px solid #ffd06a; background: transparent; color: #ffd06a; padding: 8px 11px; cursor: pointer; font: inherit; font-size: .77rem; }
+.booking-reschedule { color: #c5ff5c; display: inline-block; font-size: .76rem; margin-left: 12px; text-decoration: none; text-underline-offset: 4px; }
 .client-login-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 70% 20%, #222 0, #0a0a0a 42%); }
 .client-login-card { display: grid; gap: 42px; width: min(100%, 480px); border: 1px solid rgba(255,255,255,.15); background: rgba(17,17,17,.94); padding: 38px; }
 .client-login-card h1 { margin: 10px 0 14px; font-size: clamp(2.3rem, 7vw, 3.7rem); line-height: .95; letter-spacing: -.04em; text-transform: uppercase; }

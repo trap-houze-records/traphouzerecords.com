@@ -19,10 +19,12 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ 
 const stages = [['start', 'Iniciar'], ['mix', 'Mix'], ['master', 'Master']];
 const money = value => `${Number(value || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 function normalisePortal(data) {
+  const appointments = (data.appointments || []).map(item => ({ id: item.id, appointmentId: item.id, date: item.startsAt || 'A confirmar', time: item.endsAt ? `${String(item.startsAt || '').slice(11, 16)} — ${String(item.endsAt).slice(11, 16)}` : '', service: item.service, paid: false, amount: 0, paymentUrl: '' }));
+  const appointmentKeys = new Set(appointments.map(item => `${item.service}|${item.date}`));
   return {
     client: data.client.name,
     tracks: (data.tracks || []).map(item => ({ title: item.title, stage: item.stage, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' })),
-    bookings: (data.bookings || []).map(item => ({ date: item.startsAt || 'A confirmar', time: '', service: item.service, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' }))
+    bookings: [...appointments, ...(data.bookings || []).filter(item => !appointmentKeys.has(`${item.service}|${item.startsAt || 'A confirmar'}`)).map(item => ({ id: item.id, date: item.startsAt || 'A confirmar', time: '', service: item.service, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' }))]
   };
 }
 async function apiRequest(path, options = {}) {
@@ -49,7 +51,8 @@ function renderTrack(track) {
 function renderBooking(booking) {
   const hasAmount = Number(booking.amount || 0) > 0;
   const payment = booking.paid ? '<span>Pago ✓</span>' : hasAmount ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">Pagar ${money(booking.amount)}</button>` : '<span class="booking-payment-unset">Pagamento a definir</span>';
-  return `<article class="booking-row"><time>${escapeHtml(booking.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(booking.time || '')}</p></div><div class="booking-payment ${booking.paid ? 'paid' : 'pending'}">${payment}</div></article>`;
+  const reschedule = booking.appointmentId && bookingMoment(booking) >= new Date() ? `<a class="booking-reschedule" href="booking.html?reschedule=${encodeURIComponent(booking.appointmentId)}">Reagendar →</a>` : '';
+  return `<article class="booking-row"><time>${escapeHtml(booking.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(booking.time || '')}</p></div><div class="booking-payment ${booking.paid ? 'paid' : 'pending'}">${payment}${reschedule}</div></article>`;
 }
 function bookingMoment(booking) {
   const value = String(booking.date || '').trim().replace(' ', 'T');

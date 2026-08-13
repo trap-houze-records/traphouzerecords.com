@@ -175,11 +175,12 @@ async function portalData(clientId, env) {
   const db = clientDb(env);
   const client = await db.prepare('SELECT id, display_name AS name, username, phone, active FROM clients WHERE id = ?').bind(clientId).first();
   if (!client) return null;
-  const [tracks, bookings] = await db.batch([
+  const [tracks, bookings, appointments] = await db.batch([
     db.prepare("SELECT id, title, stage, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl FROM client_tracks WHERE client_id = ? ORDER BY created_at DESC").bind(clientId),
-    db.prepare("SELECT id, service, starts_at AS startsAt, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl FROM client_bookings WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId)
+    db.prepare("SELECT id, service, starts_at AS startsAt, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl FROM client_bookings WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId),
+    db.prepare("SELECT id, service, starts_at AS startsAt, ends_at AS endsAt, status FROM studio_appointments WHERE client_id = ? AND status != 'cancelled' ORDER BY starts_at DESC").bind(clientId)
   ]);
-  return { client, tracks: tracks.results, bookings: bookings.results };
+  return { client, tracks: tracks.results, bookings: bookings.results, appointments: appointments.results };
 }
 async function clientLogin(request, env) {
   let body;
@@ -205,6 +206,34 @@ async function clientPortal(request, env) {
   if (!session) return error('Inicie sessão para ver a sua área.', 401);
   const portal = await portalData(session.clientId, env);
   return portal?.client.active ? jsonResponse(portal) : error('A conta não está ativa.', 403);
+}
+async function clientAppointment(request, env, appointmentId) {
+  const session = await clientSession(request, env);
+  if (!session) return error('Inicie sessão para gerir a marcação.', 401);
+  const db = clientDb(env);
+  const current = await db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, google_event_id AS googleEventId FROM studio_appointments WHERE id = ? AND client_id = ? AND status != 'cancelled'").bind(appointmentId, session.clientId).first();
+  if (!current) return error('Marcação não encontrada.', 404);
+  if (request.method === 'GET') return jsonResponse(current);
+  let body;
+  try { body = await request.json(); } catch { return error('Pedido inválido.'); }
+  const date = bookingDate(body.date);
+  const time = bookingTime(body.time);
+  const duration = Number(body.duration);
+  if (!Number.isInteger(duration) || duration < 1 || duration > 10) return error('A duração deve estar entre 1 e 10 horas.');
+  if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
+  const startsAt = `${date} ${time}`;
+  const endsAt = bookingEnd(startsAt, duration);
+  if (endsAt.slice(0, 10) !== date || endsAt.slice(11, 16) > '22:00') return error('Esse horário ultrapassa o período disponível do estúdio.');
+  const appointment = { ...current, startsAt, endsAt, status: 'pending', notes: String(body.notes || current.notes || '').trim().slice(0, 2000) || null };
+  if (await hasAppointmentConflict(db, appointment, appointmentId)) return error('Este horário já não está disponível. Escolha outro, por favor.', 409);
+  await db.batch([
+    db.prepare("UPDATE studio_appointments SET starts_at = ?, ends_at = ?, status = 'pending', notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(startsAt, endsAt, appointment.notes, appointmentId),
+    db.prepare("UPDATE client_bookings SET starts_at = ?, updated_at = CURRENT_TIMESTAMP WHERE client_id = ? AND service = ? AND starts_at = ?").bind(startsAt, session.clientId, current.service, current.startsAt),
+    db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'booking.rescheduled', JSON.stringify({ appointmentId, startsAt, endsAt }))
+  ]);
+  let googleSynced = true;
+  try { appointment.googleEventId = await googleSyncAppointment(env, db, appointment); } catch (caught) { console.warn('Google Calendar: reagendamento guardado sem espelho', caught); googleSynced = false; }
+  return jsonResponse({ id: appointmentId, startsAt, endsAt, status: 'pending', googleSynced });
 }
 async function clientLogout(request, env) {
   const session = await clientSession(request, env);
@@ -604,7 +633,19 @@ async function portalAdminMutation(request, env, resource, id) {
     const current = await db.prepare('SELECT id FROM clients WHERE id = ?').bind(id).first();
     if (!current) return error('Cliente não encontrado.', 404);
     if (request.method === 'DELETE') {
-      await db.prepare('DELETE FROM clients WHERE id = ?').bind(id).run();
+      // As marcações do estúdio exigem sempre um cliente ou nome de convidado.
+      // Apagamo-las primeiro para não acionar ON DELETE SET NULL contra essa regra.
+      const appointments = (await db.prepare('SELECT id, google_event_id AS googleEventId FROM studio_appointments WHERE client_id = ?').bind(id).all()).results;
+      for (const appointment of appointments) {
+        try { await googleDeleteAppointment(env, appointment); } catch (caught) { console.warn('Google Calendar: não foi possível apagar o espelho da marcação', caught); }
+      }
+      await db.batch([
+        db.prepare('DELETE FROM studio_appointments WHERE client_id = ?').bind(id),
+        db.prepare('DELETE FROM client_sessions WHERE client_id = ?').bind(id),
+        db.prepare('DELETE FROM client_tracks WHERE client_id = ?').bind(id),
+        db.prepare('DELETE FROM client_bookings WHERE client_id = ?').bind(id),
+        db.prepare('DELETE FROM clients WHERE id = ?').bind(id)
+      ]);
       return jsonResponse({ ok: true });
     }
     const name = String(body.name || '').trim();
@@ -695,6 +736,7 @@ export default {
       else if (url.pathname === '/client/auth/login' && request.method === 'POST') response = await clientLogin(request, env);
       else if (url.pathname === '/client/auth/logout' && request.method === 'POST') response = await clientLogout(request, env);
       else if (url.pathname === '/client/portal' && request.method === 'GET') response = await clientPortal(request, env);
+      else if (/^\/client\/appointments\/[0-9a-f-]{36}$/i.test(url.pathname) && ['GET', 'PATCH'].includes(request.method)) response = await clientAppointment(request, env, url.pathname.split('/').pop());
       else if (url.pathname === '/google-calendar/status' && request.method === 'GET') response = await googleCalendarStatus(request, env);
       else if (url.pathname === '/google-calendar/connect' && request.method === 'POST') response = await googleCalendarConnect(request, env);
       else if (url.pathname === '/google-calendar/callback' && request.method === 'GET') response = await googleCalendarCallback(request, env);
