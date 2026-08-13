@@ -57,6 +57,7 @@ CREATE TABLE studio_appointments (
   client_id TEXT REFERENCES clients(id) ON DELETE SET NULL,
   guest_name TEXT,
   guest_phone TEXT,
+  guest_email TEXT,
   service TEXT NOT NULL,
   starts_at TEXT NOT NULL,
   ends_at TEXT NOT NULL,

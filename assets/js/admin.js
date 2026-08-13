@@ -136,7 +136,15 @@ function renderSchedule() {
   $('#adminTabs').hidden = true;
   $('#publishButton').hidden = true;
   $('#adminContent').innerHTML = '<div id="scheduleModuleRoot"></div>';
-  window.StudioScheduleModule.mount($('#scheduleModuleRoot'), { apiBase, getToken: () => sessionToken, getCsrf: () => csrfToken, onError: error => notice(error.message, 'error'), onNotice: notice }).catch(error => notice(error.message, 'error'));
+  window.StudioScheduleModule.mount($('#scheduleModuleRoot'), { apiBase, getToken: () => sessionToken, getCsrf: () => csrfToken, onError: error => notice(error.message, 'error'), onNotice: notice, saveBookingSchedule: async schedule => {
+    if (!draft) { const response = await fetch(`${apiBase}/content`, { cache: 'no-store' }); if (!response.ok) throw new Error('Não foi possível carregar a configuração da agenda.'); draft = await response.json(); }
+    draft.bookingSchedule = schedule;
+    const response = await fetch(`${apiBase}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CMS-CSRF': csrfToken, Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ content: draft }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Não foi possível guardar a configuração da agenda.');
+    draft = result.content || draft;
+    notice('Regras da agenda guardadas.', 'success');
+  } }).catch(error => notice(error.message, 'error'));
 }
 function renderFinance() {
   $('#adminTabs').hidden = true;

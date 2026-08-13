@@ -102,6 +102,22 @@ const defaultBookingServices = [
   { id: 'studio-art-direction', title: 'Sessão de Estúdio (Captação com engenheiro + Direção Artística)', pricePerHour: 30, active: true },
   { id: 'studio-rental', title: 'Alugar o Estúdio', pricePerHour: 10, active: true }
 ];
+const defaultBookingAvailability = { startsAt: '10:00', endsAt: '22:00', lunchStartsAt: '13:00', lunchEndsAt: '14:00', minNoticeHours: 24 };
+function bookingScheduleFromContent(content) {
+  const raw = content?.bookingSchedule && typeof content.bookingSchedule === 'object' ? content.bookingSchedule : {};
+  const serviceRules = raw.serviceRules && typeof raw.serviceRules === 'object' ? raw.serviceRules : {};
+  const blocks = Array.isArray(raw.blocks) ? raw.blocks : [];
+  const validTime = value => /^\d{2}:00$/.test(String(value || '')) ? String(value) : '';
+  const rule = item => {
+    const source = serviceRules[item.id] && typeof serviceRules[item.id] === 'object' ? serviceRules[item.id] : {};
+    const startsAt = validTime(source.startsAt) || defaultBookingAvailability.startsAt;
+    const endsAt = validTime(source.endsAt) || defaultBookingAvailability.endsAt;
+    const lunchStartsAt = validTime(source.lunchStartsAt) || defaultBookingAvailability.lunchStartsAt;
+    const lunchEndsAt = validTime(source.lunchEndsAt) || defaultBookingAvailability.lunchEndsAt;
+    return { startsAt, endsAt, lunchStartsAt, lunchEndsAt, minNoticeHours: Math.max(0, Math.min(720, Number(source.minNoticeHours ?? defaultBookingAvailability.minNoticeHours) || 0)) };
+  };
+  return { serviceRules: Object.fromEntries(bookingServicesFromContent(content).map(item => [item.id, rule(item)])), blocks: blocks.map((item, index) => ({ id: String(item.id || `block-${index + 1}`), date: String(item.date || ''), startsAt: validTime(item.startsAt), endsAt: validTime(item.endsAt), label: String(item.label || 'Bloqueio').trim().slice(0, 120) })).filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.startsAt && item.endsAt && item.endsAt > item.startsAt) };
+}
 function bookingServicesFromContent(content) {
   const source = Array.isArray(content?.bookingServices) && content.bookingServices.length ? content.bookingServices : defaultBookingServices;
   return source.map((item, index) => ({ id: String(item.id || `service-${index + 1}`), title: String(item.title || '').trim(), pricePerHour: Math.max(0, Number(item.pricePerHour || 0)), active: item.active !== false })).filter(item => item.title);
@@ -111,6 +127,13 @@ async function configuredBookingService(env, id) {
   const service = services.find(item => item.id === String(id || ''));
   if (!service || !service.active) throw inputError('Este tipo de reserva não está disponível.');
   return service;
+}
+async function bookingConfiguration(env, id) {
+  const content = (await contentFromGitHub(env)).content;
+  const service = bookingServicesFromContent(content).find(item => item.id === String(id || ''));
+  if (!service || !service.active) throw inputError('Este tipo de reserva não está disponível.');
+  const schedule = bookingScheduleFromContent(content);
+  return { service, rules: schedule.serviceRules[service.id] || defaultBookingAvailability, blocks: schedule.blocks };
 }
 
 async function login(request, env) {
@@ -477,7 +500,7 @@ async function googleSyncAppointment(env, db, appointment) {
   if (!connection?.calendarId || appointment.status === 'cancelled') return appointment.googleEventId || null;
   const client = appointment.clientId ? await db.prepare('SELECT display_name AS name, phone FROM clients WHERE id = ?').bind(appointment.clientId).first() : null;
   const name = client?.name || appointment.guestName || 'Cliente';
-  const event = { summary: `🎧 ${appointment.service} — ${name}`, description: `Reserva Trap Houze Records\nCliente: ${name}${client?.phone || appointment.guestPhone ? `\nWhatsApp: ${client?.phone || appointment.guestPhone}` : ''}${appointment.notes ? `\nNotas: ${appointment.notes}` : ''}\nEstado: ${appointment.status}`, location: 'Trap Houze Records', start: { dateTime: googleEventDateTime(appointment.startsAt), timeZone: 'Europe/Lisbon' }, end: { dateTime: googleEventDateTime(appointment.endsAt), timeZone: 'Europe/Lisbon' } };
+  const event = { summary: `🎧 ${appointment.service} — ${name}`, description: `Reserva Trap Houze Records\nCliente: ${name}${client?.phone || appointment.guestPhone ? `\nWhatsApp: ${client?.phone || appointment.guestPhone}` : ''}${appointment.guestEmail ? `\nE-mail: ${appointment.guestEmail}` : ''}${appointment.notes ? `\nNotas: ${appointment.notes}` : ''}\nEstado: ${appointment.status}`, location: 'Trap Houze Records', start: { dateTime: googleEventDateTime(appointment.startsAt), timeZone: 'Europe/Lisbon' }, end: { dateTime: googleEventDateTime(appointment.endsAt), timeZone: 'Europe/Lisbon' } };
   const id = appointment.googleEventId;
   const result = await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events${id ? `/${encodeURIComponent(id)}` : ''}`, { method: id ? 'PUT' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event) });
   const googleEventId = result.payload.id;
@@ -562,14 +585,33 @@ function isBookableDay(date) {
   const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
   return weekday >= 2 && weekday <= 6;
 }
+function bookingDateTime(date, time) { return `${date} ${time}`; }
+function bookingBlockedByRules(startsAt, endsAt, rules) {
+  const date = startsAt.slice(0, 10);
+  const startTime = startsAt.slice(11, 16);
+  const endTime = endsAt.slice(11, 16);
+  if (endsAt.slice(0, 10) !== date || startTime < rules.startsAt || endTime > rules.endsAt) return 'Esse horário está fora do período disponível para esta sessão.';
+  if (startTime < rules.lunchEndsAt && endTime > rules.lunchStartsAt) return 'Esse horário inclui a pausa de almoço.';
+  return '';
+}
+function lisbonInstant(localValue) {
+  const wanted = String(localValue).replace(' ', 'T');
+  const guess = new Date(`${wanted}:00Z`);
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(guess).reduce((all, item) => ({ ...all, [item.type]: item.value }), {});
+  const displayed = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute));
+  const intended = Date.parse(`${wanted}:00Z`);
+  return new Date(guess.getTime() + intended - displayed);
+}
 async function publicAvailability(request, env) {
   const url = new URL(request.url);
   const from = bookingDate(url.searchParams.get('from'));
   const until = bookingDate(url.searchParams.get('until'));
   if (until <= from) throw inputError('Intervalo de disponibilidade inválido.');
+  const { service, rules, blocks } = await bookingConfiguration(env, url.searchParams.get('serviceId'));
   const busy = await clientDb(env).prepare("SELECT starts_at AS startsAt, ends_at AS endsAt FROM studio_appointments WHERE status != 'cancelled' AND starts_at < ? AND ends_at > ? ORDER BY starts_at ASC").bind(`${until} 00:00`, `${from} 00:00`).all();
   const googleBusy = await googleBusyEvents(env, from, until);
-  return jsonResponse({ timezone: 'Europe/Lisbon', hours: { startsAt: '10:00', endsAt: '22:00' }, busy: [...busy.results, ...googleBusy] });
+  const configuredBlocks = blocks.filter(item => item.date >= from && item.date < until).map(item => ({ startsAt: bookingDateTime(item.date, item.startsAt), endsAt: bookingDateTime(item.date, item.endsAt), title: item.label }));
+  return jsonResponse({ timezone: 'Europe/Lisbon', serviceId: service.id, rules, busy: [...busy.results, ...googleBusy, ...configuredBlocks] });
 }
 async function publicBooking(request, env) {
   let body;
@@ -581,20 +623,24 @@ async function publicBooking(request, env) {
   if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
   const startsAt = `${date} ${time}`;
   const endsAt = bookingEnd(startsAt, duration);
-  if (endsAt.slice(0, 10) !== date || endsAt.slice(11, 16) > '22:00') return error('Esse horário ultrapassa o período disponível do estúdio.');
   const db = clientDb(env);
   const session = await clientSession(request, env);
   const sessionClient = session ? await db.prepare('SELECT id, display_name AS name, phone FROM clients WHERE id = ? AND active = 1').bind(session.clientId).first() : null;
   const guestName = String(body.name || '').trim();
-  const guestPhone = String(body.phone || '').replace(/\D/g, '');
-  const bookingService = await configuredBookingService(env, body.serviceId);
+  const guestEmail = String(body.email || '').trim().toLowerCase();
+  const { service: bookingService, rules, blocks } = await bookingConfiguration(env, body.serviceId);
   const service = bookingService.title;
   const notes = String(body.notes || '').trim().slice(0, 2000) || null;
-  if (!sessionClient && (!guestName || !/^\d{9,15}$/.test(guestPhone))) return error('Indique o nome e um WhatsApp válido.');
-  const appointment = { clientId: sessionClient?.id || null, guestName: sessionClient ? null : guestName, guestPhone: sessionClient ? null : guestPhone, service, startsAt, endsAt, status: 'pending', notes };
+  const ruleError = bookingBlockedByRules(startsAt, endsAt, rules);
+  if (ruleError) return error(ruleError, 409);
+  if (lisbonInstant(startsAt).getTime() < Date.now() + rules.minNoticeHours * 3600000) return error(`Esta sessão requer pelo menos ${rules.minNoticeHours}h de antecedência.`, 409);
+  const overlapsBlock = blocks.some(item => startsAt < bookingDateTime(item.date, item.endsAt) && endsAt > bookingDateTime(item.date, item.startsAt));
+  if (overlapsBlock) return error('Este período está bloqueado pelo estúdio.', 409);
+  if (!sessionClient && (!guestName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail))) return error('Indique o nome e um e-mail válido.');
+  const appointment = { clientId: sessionClient?.id || null, guestName: sessionClient ? null : guestName, guestPhone: null, guestEmail: sessionClient ? null : guestEmail, service, startsAt, endsAt, status: 'pending', notes };
   if (await hasAppointmentConflict(db, appointment)) return error('Este horário já não está disponível. Escolha outro, por favor.', 409);
   const id = randomId();
-  const statements = [db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, service, starts_at, ends_at, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes)];
+  const statements = [db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, guest_email, service, starts_at, ends_at, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes)];
   if (sessionClient) {
     statements.push(db.prepare("INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, 'pending', ?, NULL)").bind(randomId(), sessionClient.id, service, startsAt, Math.round(bookingService.pricePerHour * duration * 100)));
     statements.push(db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), sessionClient.id, `client:${sessionClient.id}`, 'booking.requested', JSON.stringify({ appointmentId: id, duration })));
