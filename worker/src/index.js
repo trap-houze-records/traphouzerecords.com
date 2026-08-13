@@ -346,6 +346,22 @@ async function financeSummary(request, env) {
   });
   return jsonResponse({ totals, items, clients: [...byClient.values()].sort((a, b) => b.pending - a.pending || b.paid - a.paid) });
 }
+async function dashboardSummary(request, env) {
+  const admin = await adminSession(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  const db = clientDb(env);
+  const now = new Date();
+  const month = now.toISOString().slice(0, 7);
+  const today = now.toISOString().slice(0, 10);
+  const [clients, finance, appointments, upcoming, activity] = await db.batch([
+    db.prepare('SELECT COUNT(*) AS count FROM clients WHERE active = 1'),
+    db.prepare(`SELECT COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount_cents ELSE 0 END), 0) AS paid, COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN amount_cents ELSE 0 END), 0) AS pending FROM (SELECT payment_status, amount_cents FROM client_tracks WHERE substr(created_at, 1, 7) = ? UNION ALL SELECT payment_status, amount_cents FROM client_bookings WHERE substr(COALESCE(starts_at, created_at), 1, 7) = ?)` ).bind(month, month),
+    db.prepare("SELECT COUNT(*) AS count, COALESCE(SUM((julianday(ends_at) - julianday(starts_at)) * 24), 0) AS hours FROM studio_appointments WHERE status != 'cancelled' AND substr(starts_at, 1, 7) = ?").bind(month),
+    db.prepare("SELECT a.id, COALESCE(c.display_name, a.guest_name, 'Cliente') AS clientName, a.service, a.starts_at AS startsAt, a.ends_at AS endsAt, a.status FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id WHERE a.status != 'cancelled' AND a.starts_at >= ? ORDER BY a.starts_at ASC LIMIT 5").bind(`${today} 00:00`),
+    db.prepare("SELECT l.action, l.created_at AS createdAt, COALESCE(c.display_name, 'Cliente removido') AS clientName FROM client_audit_log l LEFT JOIN clients c ON c.id = l.client_id ORDER BY l.created_at DESC LIMIT 6")
+  ]);
+  return jsonResponse({ month, clients: Number(clients.results[0]?.count || 0), finance: finance.results[0] || { paid: 0, pending: 0 }, appointments: appointments.results[0] || { count: 0, hours: 0 }, upcoming: upcoming.results || [], activity: activity.results || [] });
+}
 async function googleServiceAccessToken(env) {
   const now = Math.floor(Date.now() / 1000);
   const unsigned = `${base64UrlText(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${base64UrlText(JSON.stringify({ iss: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, scope: 'https://www.googleapis.com/auth/calendar', aud: 'https://oauth2.googleapis.com/token', iat: now - 30, exp: now + 3300 }))}`;
@@ -664,6 +680,7 @@ export default {
       else if (url.pathname === '/studio/booking' && request.method === 'POST') response = await publicBooking(request, env);
       else if (url.pathname === '/client/admin/clients' && request.method === 'GET') response = await portalAdminClients(request, env);
       else if (url.pathname === '/finance/summary' && request.method === 'GET') response = await financeSummary(request, env);
+      else if (url.pathname === '/dashboard/summary' && request.method === 'GET') response = await dashboardSummary(request, env);
       else if (url.pathname === '/client/admin/clients' && request.method === 'POST') response = await portalCreateClient(request, env);
       else if (/^\/client\/admin\/clients\/[0-9a-f-]{36}$/i.test(url.pathname) && request.method === 'GET') response = await portalAdminClient(request, env, url.pathname.split('/').pop());
       else if (url.pathname === '/studio/appointments' && request.method === 'GET') response = await studioSchedule(request, env);
