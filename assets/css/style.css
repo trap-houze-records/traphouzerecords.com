@@ -185,10 +185,10 @@ button.admin-dashboard-card:hover { border-color: #c5ff5c; }
 .booking-panel { border: 1px solid rgba(255,255,255,.14); background: #17191b; }
 .booking-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; border-bottom: 1px solid rgba(255,255,255,.1); padding: 20px 24px; }
 .booking-panel-head > div { display: grid; gap: 4px; }
-.booking-panel-title { align-items: center; display: flex !important; gap: 14px; }
+.booking-panel-title { align-items: center; display: flex !important; gap: 10px; }
 .booking-panel-meta { display: grid; gap: 4px; }
-.booking-client-back { align-items: center; border: 1px solid rgba(197,255,92,.52); color: #c5ff5c; display: inline-flex; font-size: 1.25rem; height: 32px; justify-content: center; line-height: 1; text-decoration: none; width: 32px; }
-.booking-client-back:hover { background: #c5ff5c; color: #111; }
+.booking-client-back { align-items: center; color: rgba(197,255,92,.9); display: inline-flex; font-size: 1.45rem; height: 28px; justify-content: center; line-height: 1; text-decoration: none; transition: color .2s, transform .2s; width: 22px; }
+.booking-client-back:hover { color: #fff; transform: translateX(-3px); }
 .booking-confirm-back { align-items: center; color: #c5ff5c; display: inline-flex; font-size: 1.1rem; gap: 7px; margin-top: 22px; text-decoration: none; }
 .booking-confirm-back span { font-size: .76rem; letter-spacing: .06em; text-transform: uppercase; }
 .booking-panel-head strong { font-size: 1rem; font-weight: 500; }
@@ -1080,7 +1080,7 @@ footer p {
 .booking-section-heading h2 { margin-top: 7px; font-size: 1.55rem; letter-spacing: .02em; text-transform: uppercase; }
 .booking-section-heading > span { color: rgba(255,255,255,.4); font-size: .78rem; }
 .booking-list { border-top: 1px solid rgba(255,255,255,.15); }
-.booking-row { display: grid; grid-template-columns: 92px 1fr auto; align-items: center; gap: 20px; border-bottom: 1px solid rgba(255,255,255,.12); padding: 20px 0; }
+.booking-row { display: grid; grid-template-columns: minmax(120px, 170px) 1fr auto; align-items: center; gap: 20px; border-bottom: 1px solid rgba(255,255,255,.12); padding: 20px 0; }
 .booking-row time { color: #c5ff5c; font-size: .76rem; letter-spacing: .07em; }
 .booking-row strong { display: block; font-size: 1rem; font-weight: 600; }
 .booking-row p { margin-top: 5px; color: rgba(255,255,255,.5); font-size: .86rem; }

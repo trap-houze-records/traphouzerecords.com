@@ -48,11 +48,19 @@ function renderTrack(track) {
   </article>`;
 }
 
+function bookingDisplay(booking) {
+  const moment = bookingMoment(booking);
+  if (!moment) return { date: booking.date || 'Data a confirmar', time: booking.time || 'Horário a confirmar' };
+  const date = new Intl.DateTimeFormat('pt-PT', { weekday: 'short', day: 'numeric', month: 'long' }).format(moment).replace('.', '');
+  const start = new Intl.DateTimeFormat('pt-PT', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(moment);
+  return { date, time: booking.time || start };
+}
 function renderBooking(booking) {
+  const display = bookingDisplay(booking);
   const hasAmount = Number(booking.amount || 0) > 0;
   const payment = booking.paid ? '<span>Pago ✓</span>' : hasAmount ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">Pagar ${money(booking.amount)}</button>` : '<span class="booking-payment-unset">Pagamento a definir</span>';
   const reschedule = booking.appointmentId && bookingMoment(booking) >= new Date() ? `<a class="booking-reschedule" href="booking.html?reschedule=${encodeURIComponent(booking.appointmentId)}">Reagendar →</a>` : '';
-  return `<article class="booking-row"><time>${escapeHtml(booking.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(booking.time || '')}</p></div><div class="booking-payment ${booking.paid ? 'paid' : 'pending'}">${payment}${reschedule}</div></article>`;
+  return `<article class="booking-row"><time>${escapeHtml(display.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(display.time)}</p></div><div class="booking-payment ${booking.paid ? 'paid' : 'pending'}">${payment}${reschedule}</div></article>`;
 }
 function bookingMoment(booking) {
   const value = String(booking.date || '').trim().replace(' ', 'T');
