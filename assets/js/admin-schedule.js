@@ -1,9 +1,22 @@
 window.StudioScheduleModule = (() => {
   const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
+  const asScheduleDate = value => {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(raw) ? `${raw.replace(' ', 'T')}:00Z` : raw;
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
   const dayKey = date => date.toISOString().slice(0, 10);
   const inputDate = value => value ? String(value).replace(' ', 'T').slice(0, 16) : '';
-  const displayDate = value => new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(`${String(value).replace(' ', 'T')}Z`));
-  const displayTime = value => new Intl.DateTimeFormat('pt-PT', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(`${String(value).replace(' ', 'T')}Z`));
+  const displayDate = value => {
+    const date = asScheduleDate(value);
+    return date ? new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }).format(date) : 'Data por confirmar';
+  };
+  const displayTime = value => {
+    const date = asScheduleDate(value);
+    return date ? new Intl.DateTimeFormat('pt-PT', { hour: '2-digit', minute: '2-digit', hour12: false }).format(date) : '—';
+  };
   const monday = value => { const date = new Date(value); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - ((date.getDay() + 6) % 7)); return date; };
   const shiftDays = (date, amount) => { const next = new Date(date); next.setDate(next.getDate() + amount); return next; };
   const localInput = date => { const offset = date.getTimezoneOffset(); return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16); };
@@ -58,7 +71,10 @@ window.StudioScheduleModule = (() => {
         api('/client/admin/clients'),
         api('/google-calendar/status')
       ]);
-      appointments = schedule.appointments;
+      const receivedAppointments = Array.isArray(schedule.appointments) ? schedule.appointments : [];
+      const invalidAppointments = receivedAppointments.filter(item => !asScheduleDate(item.startsAt) || !asScheduleDate(item.endsAt));
+      appointments = receivedAppointments.filter(item => !invalidAppointments.includes(item));
+      if (invalidAppointments.length) options.onNotice?.(`${invalidAppointments.length} evento${invalidAppointments.length > 1 ? 's' : ''} com data inválida foi ocultado da agenda.`, 'error');
       clients = clientList.clients;
       google = googleStatus;
       if (selected?.id) selected = appointments.find(item => item.id === selected.id) || null;

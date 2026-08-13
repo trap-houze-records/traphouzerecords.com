@@ -1069,9 +1069,9 @@ footer p {
     .admin-ready .admin-shell { width: min(100% - 28px, 1180px); display: block; }
     .admin-ready .admin-topbar { min-height: 0; flex-direction: row; align-items: center; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.12); padding: 18px 0; }
     .admin-ready .admin-topbar > div { margin-top: 0; align-items: flex-end; }
-    .admin-ready .admin-modules { flex-direction: row; overflow-x: auto; border-bottom: 1px solid rgba(255,255,255,.12); padding: 12px 0; }
+    .admin-ready .admin-modules { flex-direction: row; gap: 2px; overflow-x: auto; overscroll-behavior-inline: contain; scroll-padding-inline: 2px; border-bottom: 1px solid rgba(255,255,255,.12); padding: 12px 0; }
     .admin-ready .admin-nav-label { display: none; }
-    .admin-ready .admin-module { width: auto; border-left: 0; border-bottom: 2px solid transparent; white-space: nowrap; }
+    .admin-ready .admin-module { width: auto; border-left: 0; border-bottom: 2px solid transparent; padding: 11px 10px; white-space: nowrap; }
     .admin-ready .admin-module.active { border-color: #c5ff5c; }
     .studio-stats { grid-template-columns: repeat(2, 1fr); }
     .studio-stats article:nth-child(2) { border-right: 0; }

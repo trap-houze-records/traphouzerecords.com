@@ -342,7 +342,9 @@ async function googleApi(env, path, options = {}) {
   return { connection, payload };
 }
 function googleDateTime(value) {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(value)).reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
 }
 async function googleBusyEvents(env, from, until) {
@@ -351,7 +353,11 @@ async function googleBusyEvents(env, from, until) {
   if (!connection?.calendarId) return [];
   const query = new URLSearchParams({ timeMin: new Date(`${from}T00:00:00+01:00`).toISOString(), timeMax: new Date(`${until}T00:00:00+01:00`).toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500' });
   const { payload } = await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events?${query}`);
-  return (payload.items || []).filter(item => item.status !== 'cancelled' && item.transparency !== 'transparent' && item.start?.dateTime && item.end?.dateTime).map(item => ({ id: item.id, startsAt: googleDateTime(item.start.dateTime), endsAt: googleDateTime(item.end.dateTime), title: item.summary || 'Evento Google Calendar' }));
+  return (payload.items || []).filter(item => item.status !== 'cancelled' && item.transparency !== 'transparent' && item.start?.dateTime && item.end?.dateTime).map(item => {
+    const startsAt = googleDateTime(item.start.dateTime);
+    const endsAt = googleDateTime(item.end.dateTime);
+    return startsAt && endsAt ? { id: item.id, startsAt, endsAt, title: item.summary || 'Evento Google Calendar' } : null;
+  }).filter(Boolean);
 }
 async function googleSyncAppointment(env, db, appointment) {
   let connection;

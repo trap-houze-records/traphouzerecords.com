@@ -87,6 +87,7 @@ async function refreshSession() {
 
 function renderModules() {
   $('#adminModules').innerHTML = `<span class="admin-nav-label">Áreas</span>${modules.map(([id, label]) => `<button class="admin-module ${id === activeModule ? 'active' : ''}" data-module="${id}">${label}</button>`).join('')}`;
+  $('#adminModules').scrollLeft = 0;
 }
 function renderDashboard() {
   $('#adminTabs').hidden = true;
