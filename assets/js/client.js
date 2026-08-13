@@ -59,7 +59,7 @@ function renderBooking(booking) {
   const display = bookingDisplay(booking);
   const hasAmount = Number(booking.amount || 0) > 0;
   const payment = booking.paid ? '<span>Pago ✓</span>' : hasAmount ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">Pagar ${money(booking.amount)}</button>` : '<span class="booking-payment-unset">Pagamento a definir</span>';
-  const reschedule = booking.appointmentId && bookingMoment(booking) >= new Date() ? `<a class="booking-reschedule" href="booking.html?reschedule=${encodeURIComponent(booking.appointmentId)}">Reagendar →</a>` : '';
+  const reschedule = booking.appointmentId && bookingMoment(booking) >= new Date() ? `<a class="booking-reschedule" href="/booking.html?reschedule=${encodeURIComponent(booking.appointmentId)}">Reagendar →</a>` : '';
   return `<article class="booking-row"><time>${escapeHtml(display.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(display.time)}</p></div><div class="booking-payment ${booking.paid ? 'paid' : 'pending'}">${payment}${reschedule}</div></article>`;
 }
 function bookingMoment(booking) {
@@ -84,7 +84,7 @@ const outstanding = [...clientData.tracks, ...clientData.bookings].filter(item =
 const portalNote = apiBase ? 'Área privada · acesso protegido por credenciais.' : 'Protótipo local · o acesso real de cada cliente será ligado numa fase seguinte.';
 const bookings = splitBookings(clientData.bookings);
 portal.innerHTML = `<div class="client-shell client-simple">
-  <header class="client-header"><a class="client-brand" href="index.html" aria-label="Trap Houze Records"><img src="images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div class="client-user"><span>Olá, ${escapeHtml(clientData.client)}</span>${apiBase ? '<a class="client-book-session" href="booking.html">Agendar sessão</a>' : ''}<button class="client-signout" type="button">Sair</button></div></header>
+  <header class="client-header"><a class="client-brand" href="/" aria-label="Trap Houze Records"><img src="/images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div class="client-user"><span>Olá, ${escapeHtml(clientData.client)}</span>${apiBase ? '<a class="client-book-session" href="/booking.html">Agendar sessão</a>' : ''}<button class="client-signout" type="button">Sair</button></div></header>
   <section class="client-simple-hero"><p class="eyebrow">O teu trabalho</p><h1>A tua agenda</h1><p>Reservas, músicas e pagamentos num só lugar.</p>${outstanding ? `<div class="client-total-due"><span>Total em falta</span><strong>${money(outstanding)}</strong></div>` : ''}</section>
   <section class="booking-section booking-section-upcoming"><div class="booking-section-heading"><div><p class="eyebrow">Próximas sessões</p><h2>Reservas futuras</h2></div><span>${bookings.upcoming.length} agendadas</span></div><div class="booking-list">${bookings.upcoming.map(renderBooking).join('') || '<p class="client-empty">Ainda não tens reservas futuras.</p>'}</div></section>
   <section class="track-section"><div class="booking-section-heading"><div><p class="eyebrow">Música</p><h2>As tuas músicas</h2></div><span>${clientData.tracks.length} registadas</span></div><div class="track-list">${clientData.tracks.map(renderTrack).join('') || '<p class="client-empty">Ainda não tens músicas registadas.</p>'}</div></section>
@@ -95,7 +95,7 @@ portal.innerHTML = `<div class="client-shell client-simple">
 }
 
 function renderLogin(message = '') {
-  portal.innerHTML = `<main class="client-login-shell"><section class="client-login-card"><a class="client-brand" href="index.html" aria-label="Trap Houze Records"><img src="images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div><p class="eyebrow">Acesso privado</p><h1>O teu trabalho, num só lugar.</h1><p>Entra com o teu nome e a palavra-passe enviada pela Trap Houze Records.</p></div><form id="clientLoginForm" class="client-login-form"><label>Nome do cliente<input name="username" autocomplete="username" required></label><label>Palavra-passe<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">Entrar <span>→</span></button><p id="clientLoginMessage" role="alert">${escapeHtml(message)}</p></form><p class="client-login-help">Ainda não tens acesso? <a href="https://wa.me/351910734914" target="_blank" rel="noopener">Fala connosco</a></p></section></main>`;
+  portal.innerHTML = `<main class="client-login-shell"><section class="client-login-card"><a class="client-brand" href="/" aria-label="Trap Houze Records"><img src="/images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div><p class="eyebrow">Acesso privado</p><h1>O teu trabalho, num só lugar.</h1><p>Entra com o teu nome e a palavra-passe enviada pela Trap Houze Records.</p></div><form id="clientLoginForm" class="client-login-form"><label>Nome do cliente<input name="username" autocomplete="username" required></label><label>Palavra-passe<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">Entrar <span>→</span></button><p id="clientLoginMessage" role="alert">${escapeHtml(message)}</p></form><p class="client-login-help">Ainda não tens acesso? <a href="https://wa.me/351910734914" target="_blank" rel="noopener">Fala connosco</a></p></section></main>`;
   document.getElementById('clientLoginForm').addEventListener('submit', event => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -108,7 +108,7 @@ function renderLogin(message = '') {
         renderPortal();
       }).catch(caught => {
         const message = usesLocalPortalApi && caught.message === 'Credenciais inválidas.'
-          ? 'Estás na versão local. Esta usa uma base de dados separada da versão online; cria aqui um cliente de teste ou entra em traphouzerecords.com/client.html.'
+          ? 'Estás na versão local. Esta usa uma base de dados separada da versão online; cria aqui um cliente de teste ou entra em traphouzerecords.com/zona-do-artista/.'
           : caught.message;
         renderLogin(message);
       });
