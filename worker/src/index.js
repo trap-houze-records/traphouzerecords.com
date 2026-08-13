@@ -134,7 +134,7 @@ function randomId() { return crypto.randomUUID(); }
 function textToBase64(bytes) { return base64Url(bytes); }
 function bytesFromBase64(value) { return decodeBase64Url(value); }
 async function passwordHash(password, salt = crypto.getRandomValues(new Uint8Array(16))) {
-  if (typeof password !== 'string' || password.length < 10) throw inputError('A palavra-passe deve ter pelo menos 10 caracteres.');
+  if (typeof password !== 'string' || password.length < 6) throw inputError('A palavra-passe deve ter pelo menos 6 caracteres.');
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
   // O runtime Cloudflare limita PBKDF2 a 100 000 iterações.
   const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, key, 256);

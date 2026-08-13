@@ -1063,7 +1063,9 @@ footer p {
 .manager-content-heading { margin-bottom: 24px; }
 .manager-content-heading h2 { margin-top: 6px; font-size: 2rem; text-transform: uppercase; }
 .manager-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.manager-grid .client-card:first-child { grid-row: span 2; }
+.manager-grid .client-card:first-child { grid-column: 1 / -1; grid-row: auto; order: 3; }
+.manager-grid .client-card:nth-child(2) { order: 1; }
+.manager-grid .client-card:nth-child(3) { order: 2; }
 .manager-grid h3 { margin-bottom: 20px; font-size: 1rem; letter-spacing: .06em; text-transform: uppercase; }
 .manager-password { display: grid; grid-template-columns: 1fr auto; }
 .manager-password button { border: 1px solid rgba(255,255,255,.2); border-left: 0; background: #242424; color: #fff; cursor: pointer; padding: 0 10px; font-size: .76rem; }
