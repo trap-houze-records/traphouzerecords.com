@@ -18,7 +18,7 @@ const editorMeta = {
   artists: ['Artistas', 'Gere os artistas ou colaboradores apresentados no site.'],
   reviews: ['Avaliações', 'Edita os testemunhos que reforçam a confiança no estúdio.']
 };
-const modules = [['dashboard', 'Dashboard'], ['site', 'Editar site'], ['schedule', 'Agenda'], ['clients', 'Clientes'], ['finance', 'Financeiro']];
+const modules = [['dashboard', 'Dashboard'], ['site', 'Editar site'], ['schedule', 'Agenda'], ['clients', 'Clientes'], ['finance', 'Finanças']];
 const $ = selector => document.querySelector(selector);
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const field = (label, path, value, type = 'text') => `<label class="admin-field"><span>${label}</span>${type === 'textarea' ? `<textarea data-bind="${path}" rows="4">${escapeHtml(value || '')}</textarea>` : `<input type="${type}" data-bind="${path}" value="${escapeHtml(value || '')}">`}</label>`;
@@ -51,7 +51,7 @@ const bookingServiceDefaults = [
   { id: 'studio-art-direction', title: 'Sessão de Estúdio (Captação com engenheiro + Direção Artística)', pricePerHour: 30, active: true },
   { id: 'studio-rental', title: 'Alugar o Estúdio', pricePerHour: 10, active: true }
 ];
-function renderSite() { const site = draft.site; return `<section class="admin-grid">${card('Dados gerais', [field('Nome', 'site.name', site.name), field('Subtítulo', 'site.tagline', site.tagline), field('Localização', 'site.location', site.location), field('E-mail', 'site.email', site.email), field('URL Instagram', 'site.instagram', site.instagram), field('Nome no Instagram', 'site.instagramHandle', site.instagramHandle), field('WhatsApp (só algarismos)', 'site.whatsapp', site.whatsapp), field('URL de agendamento', 'site.bookingUrl', site.bookingUrl), field('Horário', 'site.hours', site.hours)].join(''))}${card('Tipos de reserva e preços', `<p class="admin-hint">Os preços são por hora e entram automaticamente em cada nova marcação.</p>${draft.bookingServices.map((service, index) => `<div class="admin-row">${field('Nome', `bookingServices.${index}.title`, service.title)}${field('Preço por hora (€)', `bookingServices.${index}.pricePerHour`, service.pricePerHour, 'number')}${checkbox('Disponível', `bookingServices.${index}.active`, service.active)}</div>`).join('')}`)}</section>`; }
+function renderSite() { const site = draft.site; return `<section class="admin-grid">${card('Dados gerais', [field('Nome', 'site.name', site.name), field('Subtítulo', 'site.tagline', site.tagline), field('Localização', 'site.location', site.location), field('E-mail', 'site.email', site.email), field('URL Instagram', 'site.instagram', site.instagram), field('Nome no Instagram', 'site.instagramHandle', site.instagramHandle), field('WhatsApp (só algarismos)', 'site.whatsapp', site.whatsapp), field('URL de agendamento', 'site.bookingUrl', site.bookingUrl), field('Horário', 'site.hours', site.hours)].join(''))}</section>`; }
 function renderMenu() { return `<section>${card('Navegação', '<p class="admin-hint">Desative uma secção para escondê-la do menu e do site.</p>' + draft.navigation.map((item, index) => `<div class="admin-row">${field('Nome', `navigation.${index}.label`, item.label)}${field('ID', `navigation.${index}.id`, item.id)}${checkbox('Visível', `navigation.${index}.visible`, item.visible)}</div>`).join(''))}</section>`; }
 function renderHero() { return `<section>${listCards('hero', (item, index) => card(`Destaque ${index + 1}`, `${field('Título', `hero.${index}.title`, item.title)}${field('Subtítulo', `hero.${index}.subtitle`, item.subtitle)}${field('Imagem (URL)', `hero.${index}.image`, item.image)}`, `<button class="admin-icon" data-remove="hero" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar destaque')}</section>`; }
 function renderServices() { return `<section>${listCards('services', (item, index) => card(item.title || `Serviço ${index + 1}`, `${field('Título', `services.${index}.title`, item.title)}${field('Ícone', `services.${index}.icon`, item.icon)}${field('Descrição', `services.${index}.description`, item.description, 'textarea')}<label class="admin-field"><span>Ação</span><select data-bind="services.${index}.action"><option value="booking" ${item.action === 'booking' ? 'selected' : ''}>Agenda</option><option value="whatsapp" ${item.action === 'whatsapp' ? 'selected' : ''}>WhatsApp</option></select></label>${checkbox('Disponível', `services.${index}.visible`, item.visible)}`, `<button class="admin-icon" data-remove="services" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar serviço')}</section>`; }
@@ -142,7 +142,14 @@ function renderFinance() {
   $('#adminTabs').hidden = true;
   $('#publishButton').hidden = true;
   $('#adminContent').innerHTML = '<div id="financeModuleRoot"></div>';
-  window.FinanceModule.mount($('#financeModuleRoot'), { apiBase, getToken: () => sessionToken }).catch(error => notice(error.message, 'error'));
+  window.FinanceModule.mount($('#financeModuleRoot'), { apiBase, getToken: () => sessionToken, bookingServices: draft?.bookingServices || bookingServiceDefaults, saveBookingServices: async services => {
+    if (!draft) { const response = await fetch(`${apiBase}/content`, { cache: 'no-store' }); if (!response.ok) throw new Error('Não foi possível carregar a configuração de preços.'); draft = await response.json(); }
+    draft.bookingServices = services;
+    const response = await fetch(`${apiBase}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CMS-CSRF': csrfToken, Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ content: draft }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Não foi possível guardar os preços.');
+    notice(`Preços publicados. Commit ${result.commit.slice(0, 7)}.`, 'success');
+  }, onError: error => notice(error.message, 'error'), onNotice: notice }).catch(error => notice(error.message, 'error'));
 }
 function selectModule(module) {
   activeModule = module;

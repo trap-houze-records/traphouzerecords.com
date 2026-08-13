@@ -145,6 +145,8 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .finance-panel-head { align-items: start; border-bottom: 1px solid rgba(255,255,255,.11); display: flex; justify-content: space-between; gap: 12px; padding: 20px; }
 .finance-panel-head h3 { font-size: 1.08rem; margin: 5px 0 0; }
 .finance-panel-head > span { color: #16c7f3; font-size: 1.35rem; }
+.finance-pricing { margin-bottom: 18px; }
+.finance-pricing-list .admin-row { grid-template-columns: minmax(0, 1.5fr) minmax(140px, .45fr) auto; }
 .finance-list { display: grid; }
 .finance-item, .finance-client { align-items: center; border-bottom: 1px solid rgba(255,255,255,.09); display: flex; justify-content: space-between; gap: 16px; padding: 16px 20px; }
 .finance-item:last-child, .finance-client:last-child { border-bottom: 0; }
