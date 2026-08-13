@@ -211,9 +211,10 @@ async function clientLogin(request, env) {
   }
   if (!row || !row.active || !await passwordMatches(password, row.password_hash, row.password_salt)) return error('Credenciais inválidas.', 401);
   const sessionId = randomId();
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 8).toISOString().replace('T', ' ').replace('Z', '');
+  const clientSessionSeconds = 60 * 60 * 24 * 30;
+  const expiresAt = new Date(Date.now() + 1000 * clientSessionSeconds).toISOString().replace('T', ' ').replace('Z', '');
   await db.prepare('INSERT INTO client_sessions (id, client_id, expires_at) VALUES (?, ?, ?)').bind(sessionId, row.id, expiresAt).run();
-  const token = await signedValue({ role: 'client', clientId: row.id, sessionId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 8 }, env);
+  const token = await signedValue({ role: 'client', clientId: row.id, sessionId, exp: Math.floor(Date.now() / 1000) + clientSessionSeconds }, env);
   return jsonResponse({ token, portal: await portalData(row.id, env) });
 }
 async function clientPortal(request, env) {

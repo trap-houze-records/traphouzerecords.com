@@ -13,7 +13,12 @@ const defaultClientData = {
 let clientData = defaultClientData;
 const apiBase = (window.CLIENT_PORTAL_API_URL || window.CMS_API_URL || '').replace(/\/$/, '');
 const usesLocalPortalApi = /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(apiBase);
-let apiToken = sessionStorage.getItem('th_client_portal_token') || '';
+const clientTokenKey = 'th_client_portal_token';
+let apiToken = localStorage.getItem(clientTokenKey) || sessionStorage.getItem(clientTokenKey) || '';
+if (apiToken) {
+  localStorage.setItem(clientTokenKey, apiToken);
+  sessionStorage.removeItem(clientTokenKey);
+}
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const stages = [['start', 'Iniciar'], ['mix', 'Mix'], ['master', 'Master']];
@@ -103,7 +108,7 @@ function renderLogin(message = '') {
     if (apiBase) {
       apiRequest('/client/auth/login', { method: 'POST', body: JSON.stringify({ username, password: form.get('password') }) }).then(result => {
         apiToken = result.token;
-        sessionStorage.setItem('th_client_portal_token', apiToken);
+        localStorage.setItem(clientTokenKey, apiToken);
         clientData = normalisePortal(result.portal);
         renderPortal();
       }).catch(caught => {
@@ -133,7 +138,7 @@ document.addEventListener('click', event => {
   }
   if (event.target.closest('.client-signout')) {
     sessionStorage.removeItem('th_client_demo');
-    if (apiBase && apiToken) apiRequest('/client/auth/logout', { method: 'POST' }).catch(() => {}).finally(() => { apiToken = ''; sessionStorage.removeItem('th_client_portal_token'); renderLogin(); });
+    if (apiBase && apiToken) apiRequest('/client/auth/logout', { method: 'POST' }).catch(() => {}).finally(() => { apiToken = ''; localStorage.removeItem(clientTokenKey); sessionStorage.removeItem(clientTokenKey); renderLogin(); });
     else renderLogin();
   }
 });
@@ -150,7 +155,7 @@ const savedClient = loadClients().find(item => item.username.toLowerCase() === s
 const previewUsername = new URLSearchParams(location.search).get('preview')?.toLowerCase();
 const previewClient = location.protocol === 'file:' && previewUsername ? loadClients().find(item => item.username.toLowerCase() === previewUsername) : null;
 if (apiBase && apiToken) {
-  apiRequest('/client/portal').then(result => { clientData = normalisePortal(result); renderPortal(); }).catch(() => { apiToken = ''; sessionStorage.removeItem('th_client_portal_token'); renderLogin(); });
+  apiRequest('/client/portal').then(result => { clientData = normalisePortal(result); renderPortal(); }).catch(() => { apiToken = ''; localStorage.removeItem(clientTokenKey); sessionStorage.removeItem(clientTokenKey); renderLogin(); });
 } else if (apiBase) renderLogin();
 else if (previewClient) { clientData = previewClient; renderPortal(); }
 else if (savedClient?.active !== false) { clientData = savedClient; renderPortal(); }
