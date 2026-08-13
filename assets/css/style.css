@@ -186,8 +186,9 @@ button.admin-dashboard-card:hover { border-color: #c5ff5c; }
 .booking-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; border-bottom: 1px solid rgba(255,255,255,.1); padding: 20px 24px; }
 .booking-panel-head > div { display: grid; gap: 4px; }
 .booking-panel-title { align-items: center; display: flex !important; gap: 14px; }
-.booking-client-back { align-items: center; border-right: 1px solid rgba(255,255,255,.16); color: #c5ff5c; display: inline-flex; font-size: 1.25rem; line-height: 1; padding: 5px 14px 5px 0; text-decoration: none; }
-.booking-client-back span { color: rgba(255,255,255,.68) !important; font-size: .72rem !important; letter-spacing: .05em; margin-left: 6px; text-transform: uppercase; }
+.booking-panel-meta { display: grid; gap: 4px; }
+.booking-client-back { align-items: center; border: 1px solid rgba(197,255,92,.52); color: #c5ff5c; display: inline-flex; font-size: 1.25rem; height: 32px; justify-content: center; line-height: 1; text-decoration: none; width: 32px; }
+.booking-client-back:hover { background: #c5ff5c; color: #111; }
 .booking-panel-head strong { font-size: 1rem; font-weight: 500; }
 .booking-panel-head span { color: rgba(255,255,255,.56); font-size: .78rem; }
 .booking-panel-head > span { color: #c5ff5c; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
