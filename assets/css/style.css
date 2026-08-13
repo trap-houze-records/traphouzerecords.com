@@ -146,7 +146,21 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .finance-panel-head h3 { font-size: 1.08rem; margin: 5px 0 0; }
 .finance-panel-head > span { color: #16c7f3; font-size: 1.35rem; }
 .finance-pricing { margin-bottom: 18px; }
-.finance-pricing-list .admin-row { grid-template-columns: minmax(0, 1.5fr) minmax(140px, .45fr) auto; }
+.finance-pricing-head { align-items: center; border-bottom: 1px solid rgba(255,255,255,.11); display: flex; justify-content: space-between; gap: 20px; padding: 16px 20px; }
+.finance-pricing-head h3 { font-size: 1rem; font-weight: 600; }
+.finance-pricing-head p { color: rgba(255,255,255,.48); font-size: .74rem; margin-top: 4px; }
+.finance-save { border: 1px solid #16c7f3; background: transparent; color: #16c7f3; cursor: pointer; font: inherit; font-size: .75rem; padding: 8px 13px; }
+.finance-save:hover { background: #16c7f3; color: #111; }
+.finance-pricing-list { display: grid; }
+.finance-price-row { align-items: end; display: grid; grid-template-columns: minmax(0, 1fr) 110px auto; gap: 12px; border-bottom: 1px solid rgba(255,255,255,.08); padding: 11px 20px; }
+.finance-price-row:last-child { border-bottom: 0; }
+.finance-price-row label { display: grid; gap: 5px; }
+.finance-price-row label > span { color: rgba(255,255,255,.48); font-size: .66rem; letter-spacing: .04em; text-transform: uppercase; }
+.finance-price-row input:not([type="checkbox"]) { min-width: 0; border: 0; border-bottom: 1px solid rgba(255,255,255,.18); background: transparent; color: #fff; font: inherit; font-size: .84rem; padding: 5px 0; }
+.finance-price-row input:not([type="checkbox"]):focus { border-color: #16c7f3; outline: 0; }
+.finance-price-row .finance-price-availability { align-items: center; display: flex; gap: 7px; min-height: 27px; white-space: nowrap; }
+.finance-price-row .finance-price-availability span { color: rgba(255,255,255,.67); font-size: .72rem; letter-spacing: 0; text-transform: none; }
+.finance-price-row input[type="checkbox"] { accent-color: #16c7f3; }
 .finance-list { display: grid; }
 .finance-item, .finance-client { align-items: center; border-bottom: 1px solid rgba(255,255,255,.09); display: flex; justify-content: space-between; gap: 16px; padding: 16px 20px; }
 .finance-item:last-child, .finance-client:last-child { border-bottom: 0; }
@@ -253,7 +267,7 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .studio-stats span { color: rgba(255,255,255,.48); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .studio-stats strong { font-size: 2rem; font-weight: 500; }
 .studio-stats small { color: #16c7f3; font-size: .78rem; }
-.studio-dashboard-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 52px; margin-top: 48px; }
+.studio-dashboard-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 52px; margin-top: 32px; }
 .studio-panel { border-top: 1px solid rgba(255,255,255,.13); }
 .studio-panel-heading { padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,.1); }
 .studio-panel-heading h3 { margin-top: 5px; font-size: 1.08rem; font-weight: 500; }
@@ -1112,21 +1126,21 @@ footer p {
 .manager-hero > p:not(.eyebrow) { color: rgba(255,255,255,.6); }
 .manager-backup { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 .manager-backup button, .manager-backup label { border: 1px solid rgba(255,255,255,.28); background: transparent; color: #fff; cursor: pointer; font: inherit; font-size: .78rem; padding: 10px 12px; }
-.manager-layout { display: grid; grid-template-columns: 240px 1fr; gap: 38px; }
-.manager-sidebar { border-right: 1px solid rgba(255,255,255,.14); padding-right: 22px; }
-.manager-add, .manager-copy { width: 100%; border: 0; background: #16c7f3; color: #111; cursor: pointer; font: inherit; padding: 12px; text-align: left; }
-.manager-client-list { display: grid; gap: 4px; margin-top: 16px; }
-.manager-client-list button { display: grid; gap: 4px; border: 0; background: transparent; color: rgba(255,255,255,.56); cursor: pointer; padding: 13px 10px; text-align: left; }
+.manager-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 30px; }
+.manager-sidebar { border-right: 1px solid rgba(255,255,255,.14); padding-right: 18px; }
+.manager-add, .manager-copy { width: 100%; border: 0; background: #16c7f3; color: #111; cursor: pointer; font: inherit; padding: 10px; text-align: left; }
+.manager-client-list { display: grid; gap: 2px; margin-top: 10px; }
+.manager-client-list button { display: grid; gap: 3px; border: 0; background: transparent; color: rgba(255,255,255,.56); cursor: pointer; padding: 10px 8px; text-align: left; }
 .manager-client-list button.active { background: #202020; color: #fff; }
 .manager-client-list span { font-size: .78rem; }
 .manager-content-heading, .manager-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.manager-content-heading { margin-bottom: 24px; }
-.manager-content-heading h2 { margin-top: 6px; font-size: 2rem; text-transform: uppercase; }
-.manager-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.manager-content-heading { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.manager-content-heading h2 { margin-top: 4px; font-size: 1.35rem; text-transform: uppercase; }
+.manager-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .manager-grid .client-card:first-child { grid-column: 1 / -1; grid-row: auto; order: 3; }
 .manager-grid .client-card:nth-child(2) { order: 1; }
 .manager-grid .client-card:nth-child(3) { order: 2; }
-.manager-grid h3 { margin-bottom: 20px; font-size: 1rem; letter-spacing: .06em; text-transform: uppercase; }
+.manager-grid h3 { margin-bottom: 14px; font-size: .88rem; letter-spacing: .06em; text-transform: uppercase; }
 .manager-password { display: grid; grid-template-columns: 1fr auto; }
 .manager-password button { border: 1px solid rgba(255,255,255,.2); border-left: 0; background: #242424; color: #fff; cursor: pointer; padding: 0 10px; font-size: .76rem; }
 .manager-copy { margin-top: 8px; text-align: center; }
