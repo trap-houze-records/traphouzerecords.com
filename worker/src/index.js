@@ -363,8 +363,10 @@ function appointmentStatus(value) {
 }
 async function appointmentPayload(body, db) {
   let clientId = String(body.clientId || '').trim() || null;
-  const guestName = String(body.guestName || '').trim() || null;
-  const guestEmail = clientEmail(body.guestEmail || body.email, !clientId);
+  // A Agenda usa clientName/clientEmail; os pedidos públicos usam guestName/guestEmail.
+  // Aceitar ambos impede que uma marcação criada pelo admin perca o contacto.
+  const guestName = String(body.guestName || body.clientName || '').trim() || null;
+  const guestEmail = clientEmail(body.guestEmail || body.clientEmail || body.email, !clientId);
   const service = String(body.service || '').trim();
   const startsAt = appointmentDate(body.startsAt, 'Data de início');
   const endsAt = appointmentDate(body.endsAt, 'Data de fim');
