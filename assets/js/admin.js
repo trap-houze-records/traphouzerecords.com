@@ -175,8 +175,8 @@ function selectModule(module) {
   loadContent().catch(error => notice(error.message, 'error'));
 }
 function showEditor() {
-  $('#adminTitle').textContent = 'Gerir o estúdio';
-  $('#adminDescription').textContent = 'Conteúdos, clientes e operações, numa única área privada.';
+  $('#adminTitle').hidden = true;
+  $('#adminDescription').hidden = true;
   $('#adminModules').hidden = false;
   $('#adminContent').hidden = false;
   document.body.classList.add('admin-ready');
