@@ -24,6 +24,7 @@ function decodeBase64(value) {
 function jsonResponse(body, status = 200, headers = {}) { return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=UTF-8', ...headers } }); }
 function error(message, status = 400) { return jsonResponse({ error: message }, status); }
 function inputError(message) { const caught = new Error(message); caught.status = 400; return caught; }
+function escapeHtml(value = '') { return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]); }
 function allowedOrigin(request, env) {
   return request.headers.get('Origin') === env.ADMIN_ORIGIN ? env.ADMIN_ORIGIN : '';
 }
@@ -211,12 +212,12 @@ async function requirePortalAdmin(request, env) {
 }
 async function portalData(clientId, env) {
   const db = clientDb(env);
-  const client = await db.prepare('SELECT id, display_name AS name, username, phone, active FROM clients WHERE id = ?').bind(clientId).first();
+  const client = await db.prepare('SELECT id, display_name AS name, username, email, phone, active FROM clients WHERE id = ?').bind(clientId).first();
   if (!client) return null;
   const [tracks, bookings, appointments] = await db.batch([
     db.prepare("SELECT id, title, stage, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl, samply_url AS samplyUrl FROM client_tracks WHERE client_id = ? ORDER BY created_at DESC").bind(clientId),
-    db.prepare("SELECT id, service, starts_at AS startsAt, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl FROM client_bookings WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId),
-    db.prepare("SELECT id, service, starts_at AS startsAt, ends_at AS endsAt, status FROM studio_appointments WHERE client_id = ? AND status != 'cancelled' ORDER BY starts_at DESC").bind(clientId)
+    db.prepare("SELECT id, appointment_id AS appointmentId, service, starts_at AS startsAt, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl FROM client_bookings WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId),
+    db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, amount_cents AS amountCents, payment_status AS paymentStatus, payment_url AS paymentUrl FROM studio_appointments WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId)
   ]);
   return { client, tracks: tracks.results, bookings: bookings.results, appointments: appointments.results };
 }
@@ -250,7 +251,7 @@ async function clientAppointment(request, env, appointmentId) {
   const session = await clientSession(request, env);
   if (!session) return error('Inicie sessão para gerir a marcação.', 401);
   const db = clientDb(env);
-  const current = await db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, google_event_id AS googleEventId FROM studio_appointments WHERE id = ? AND client_id = ? AND status != 'cancelled'").bind(appointmentId, session.clientId).first();
+  const current = await db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, amount_cents AS amountCents, payment_status AS paymentStatus, payment_url AS paymentUrl, google_event_id AS googleEventId FROM studio_appointments WHERE id = ? AND client_id = ? AND status != 'cancelled'").bind(appointmentId, session.clientId).first();
   if (!current) return error('Marcação não encontrada.', 404);
   if (request.method === 'GET') return jsonResponse(current);
   let body;
@@ -274,12 +275,14 @@ async function clientAppointment(request, env, appointmentId) {
   if (await hasAppointmentConflict(db, appointment, appointmentId)) return error('Este horário já não está disponível. Escolha outro, por favor.', 409);
   await db.batch([
     db.prepare("UPDATE studio_appointments SET starts_at = ?, ends_at = ?, status = 'pending', notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(startsAt, endsAt, appointment.notes, appointmentId),
-    db.prepare("UPDATE client_bookings SET starts_at = ?, updated_at = CURRENT_TIMESTAMP WHERE client_id = ? AND service = ? AND starts_at = ?").bind(startsAt, session.clientId, current.service, current.startsAt),
     db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'booking.rescheduled', JSON.stringify({ appointmentId, startsAt, endsAt }))
   ]);
+  await syncAppointmentBooking(db, appointmentId, appointment);
   let googleSynced = true;
   try { appointment.googleEventId = await googleSyncAppointment(env, db, appointment); } catch (caught) { console.warn('Google Calendar: reagendamento guardado sem espelho', caught); googleSynced = false; }
-  return jsonResponse({ id: appointmentId, startsAt, endsAt, status: 'pending', googleSynced });
+  let notificationSent = false;
+  try { notificationSent = await sendBookingNotification(env, appointment, { kind: 'reagendada', clientName: (await db.prepare('SELECT display_name AS name FROM clients WHERE id = ?').bind(session.clientId).first())?.name || 'Cliente' }); } catch (caught) { console.warn('E-mail: reagendamento guardado sem notificação', caught); }
+  return jsonResponse({ id: appointmentId, startsAt, endsAt, status: 'pending', googleSynced, notificationSent });
 }
 async function clientLogout(request, env) {
   const session = await clientSession(request, env);
@@ -289,7 +292,7 @@ async function clientLogout(request, env) {
 async function portalAdminClients(request, env) {
   const user = await adminSession(request, env);
   if (!user) return error('Inicie sessão como administrador.', 401);
-  const clients = await clientDb(env).prepare('SELECT id, display_name AS name, username, phone, active, created_at AS createdAt FROM clients ORDER BY display_name COLLATE NOCASE').all();
+  const clients = await clientDb(env).prepare('SELECT id, display_name AS name, username, email, phone, active, created_at AS createdAt FROM clients ORDER BY display_name COLLATE NOCASE').all();
   return jsonResponse({ clients: clients.results });
 }
 async function portalAdminClient(request, env, clientId) {
@@ -305,19 +308,20 @@ async function portalCreateClient(request, env) {
   try { body = await request.json(); } catch { return error('Pedido inválido.'); }
   const name = String(body.name || '').trim();
   const username = String(body.username || '').trim().toLowerCase();
+  const email = clientEmail(body.email);
   const phone = String(body.phone || '').replace(/\D/g, '');
   if (!name || !/^[a-z0-9][a-z0-9._-]{2,63}$/.test(username)) return error('Nome ou utilizador inválido.');
   if (phone && !/^\d{9,15}$/.test(phone)) return error('Número de WhatsApp inválido.');
   const password = await passwordHash(String(body.password || ''));
   const id = randomId();
   try {
-    await clientDb(env).prepare('INSERT INTO clients (id, display_name, username, phone, password_hash, password_salt, active) VALUES (?, ?, ?, ?, ?, ?, 1)').bind(id, name, username, phone || null, password.hash, password.salt).run();
+    await clientDb(env).prepare('INSERT INTO clients (id, display_name, username, email, phone, password_hash, password_salt, active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)').bind(id, name, username, email, phone || null, password.hash, password.salt).run();
   } catch (caught) {
-    if (String(caught.message).includes('UNIQUE')) return error('Esse utilizador já existe.', 409);
+    if (String(caught.message).includes('UNIQUE')) return error('Esse utilizador ou e-mail já existe.', 409);
     throw caught;
   }
   await clientDb(env).prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), id, admin.login, 'client.created').run();
-  return jsonResponse({ id, name, username, phone, active: true }, 201);
+  return jsonResponse({ id, name, username, email, phone, active: true }, 201);
 }
 function cents(value) {
   const amount = Number(value);
@@ -331,6 +335,12 @@ function paymentStatus(value) {
 function paymentUrl(value) {
   if (!value) return null;
   try { const url = new URL(value); if (url.protocol !== 'https:') throw new Error(); return url.toString(); } catch { throw inputError('O link de pagamento deve usar HTTPS.'); }
+}
+function clientEmail(value, required = false) {
+  const email = String(value || '').trim().toLowerCase();
+  if (!email && !required) return null;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw inputError(required ? 'Indique um e-mail válido para o novo cliente.' : 'E-mail inválido.');
+  return email;
 }
 function samplyPlayerUrl(value) {
   if (!value) return null;
@@ -352,19 +362,54 @@ function appointmentStatus(value) {
   return value;
 }
 async function appointmentPayload(body, db) {
-  const clientId = String(body.clientId || '').trim() || null;
+  let clientId = String(body.clientId || '').trim() || null;
   const guestName = String(body.guestName || '').trim() || null;
-  const guestPhone = String(body.guestPhone || '').replace(/\D/g, '') || null;
+  const guestEmail = clientEmail(body.guestEmail || body.email, !clientId);
   const service = String(body.service || '').trim();
   const startsAt = appointmentDate(body.startsAt, 'Data de início');
   const endsAt = appointmentDate(body.endsAt, 'Data de fim');
   const status = appointmentStatus(body.status || 'confirmed');
   const notes = String(body.notes || '').trim().slice(0, 2000) || null;
-  if (!service || (!clientId && !guestName)) throw inputError('Indique o serviço e um cliente ou contacto.');
+  if (!service || (!clientId && !guestName)) throw inputError('Indique o serviço e o cliente.');
   if (endsAt <= startsAt) throw inputError('A hora de fim deve ser posterior à hora de início.');
-  if (guestPhone && !/^\d{9,15}$/.test(guestPhone)) throw inputError('Número de WhatsApp inválido.');
   if (clientId && !await db.prepare('SELECT id FROM clients WHERE id = ?').bind(clientId).first()) throw inputError('Cliente não encontrado.');
-  return { clientId, guestName, guestPhone, service, startsAt, endsAt, status, notes };
+  let newClient = null;
+  if (!clientId) {
+    const existing = await db.prepare('SELECT id FROM clients WHERE email = ? COLLATE NOCASE LIMIT 1').bind(guestEmail).first();
+    if (existing) clientId = existing.id;
+    else newClient = { name: guestName, email: guestEmail };
+  }
+  return { clientId, guestName: clientId ? null : guestName, guestPhone: null, guestEmail: clientId ? null : guestEmail, newClient, service, startsAt, endsAt, status, notes, amountCents: cents(body.amount || 0), paymentStatus: paymentStatus(body.paymentStatus || 'pending'), paymentUrl: paymentUrl(body.paymentUrl) };
+}
+async function appointmentClient(db, appointment) {
+  if (!appointment.newClient) return appointment;
+  const existing = await db.prepare('SELECT id FROM clients WHERE email = ? COLLATE NOCASE LIMIT 1').bind(appointment.newClient.email).first();
+  if (existing) return { ...appointment, clientId: existing.id, guestName: null, guestEmail: null, newClient: null };
+  const base = appointment.newClient.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '-').replace(/^[^a-z0-9]+/, '').slice(0, 42) || 'cliente';
+  let username = `cliente-${base}`.slice(0, 60);
+  for (let attempt = 0; await db.prepare('SELECT id FROM clients WHERE username = ? COLLATE NOCASE').bind(username).first(); attempt += 1) username = `cliente-${base.slice(0, 46)}-${crypto.randomUUID().slice(0, 6)}`;
+  const password = await passwordHash(crypto.randomUUID());
+  const id = randomId();
+  await db.prepare('INSERT INTO clients (id, display_name, username, email, password_hash, password_salt, active) VALUES (?, ?, ?, ?, ?, ?, 0)').bind(id, appointment.newClient.name, username, appointment.newClient.email, password.hash, password.salt).run();
+  return { ...appointment, clientId: id, guestName: null, guestEmail: null, newClient: null, clientCreated: true };
+}
+async function syncAppointmentBooking(db, appointmentId, appointment) {
+  const linked = await db.prepare('SELECT id FROM client_bookings WHERE appointment_id = ?').bind(appointmentId).first();
+  if (!appointment.clientId) {
+    if (linked) await db.prepare('DELETE FROM client_bookings WHERE id = ?').bind(linked.id).run();
+    return;
+  }
+  const values = [appointment.clientId, appointment.service, appointment.startsAt, appointment.paymentStatus, appointment.amountCents, appointment.paymentUrl];
+  if (linked) {
+    await db.prepare('UPDATE client_bookings SET client_id = ?, service = ?, starts_at = ?, payment_status = ?, amount_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE appointment_id = ?').bind(...values, appointmentId).run();
+    return;
+  }
+  const legacy = await db.prepare('SELECT id FROM client_bookings WHERE appointment_id IS NULL AND client_id = ? AND service = ? AND starts_at = ? LIMIT 1').bind(appointment.clientId, appointment.service, appointment.startsAt).first();
+  if (legacy) {
+    await db.prepare('UPDATE client_bookings SET appointment_id = ?, payment_status = ?, amount_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(appointmentId, appointment.paymentStatus, appointment.amountCents, appointment.paymentUrl, legacy.id).run();
+    return;
+  }
+  await db.prepare('INSERT INTO client_bookings (id, client_id, appointment_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(randomId(), appointment.clientId, appointmentId, appointment.service, appointment.startsAt, appointment.paymentStatus, appointment.amountCents, appointment.paymentUrl).run();
 }
 async function hasAppointmentConflict(db, appointment, excludeId = '') {
   if (appointment.status === 'cancelled') return false;
@@ -418,6 +463,7 @@ async function financeSummary(request, env) {
     UNION ALL
     SELECT b.id, b.client_id AS clientId, c.display_name AS clientName, 'booking' AS type, b.service AS description, NULL AS stage, b.payment_status AS paymentStatus, b.amount_cents AS amountCents, b.payment_url AS paymentUrl, COALESCE(b.starts_at, b.created_at) AS createdAt
     FROM client_bookings b JOIN clients c ON c.id = b.client_id
+    WHERE b.appointment_id IS NULL
     ORDER BY createdAt DESC
   `).all();
   const items = records.results || [];
@@ -520,6 +566,44 @@ async function googleDeleteAppointment(env, appointment) {
     const connection = await activeGoogleConnection(env);
     if (connection?.calendarId) await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events/${encodeURIComponent(appointment.googleEventId)}`, { method: 'DELETE' });
   } catch (caught) { console.warn('Google Calendar: não foi possível apagar evento', caught); }
+}
+function bookingNotificationTime(value) {
+  const [date = '', clock = ''] = String(value || '').split(' ');
+  const [year = '', month = '', day = ''] = date.split('-');
+  return year && month && day && clock ? `${day}/${month}/${year} · ${clock}` : String(value || '—');
+}
+async function sendBookingNotification(env, appointment, { kind = 'nova', clientName = '', clientEmail = '' } = {}) {
+  const apiKey = String(env.RESEND_API_KEY || '').trim();
+  const recipient = String(env.BOOKING_NOTIFICATION_EMAIL || '').trim();
+  const sender = String(env.BOOKING_NOTIFICATION_FROM || '').trim();
+  if (!apiKey || !recipient || !sender) return false;
+  const name = clientName || appointment.guestName || 'Cliente';
+  const label = kind === 'reagendada' ? 'Reserva reagendada' : 'Nova reserva';
+  const period = `${bookingNotificationTime(appointment.startsAt)} — ${String(appointment.endsAt || '').slice(11, 16)}`;
+  const lines = [
+    label,
+    '',
+    `Cliente: ${name}`,
+    clientEmail || appointment.guestEmail ? `E-mail: ${clientEmail || appointment.guestEmail}` : '',
+    `Sessão: ${appointment.service}`,
+    `Horário: ${period}`,
+    `Estado: ${appointment.status === 'confirmed' ? 'Confirmada' : 'Pendente'}`,
+    appointment.notes ? `Notas: ${appointment.notes}` : ''
+  ].filter(Boolean);
+  const details = lines.slice(2).map(line => `<p style="margin:0 0 9px">${escapeHtml(line)}</p>`).join('');
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      from: sender,
+      to: [recipient],
+      subject: `${label} — ${name}`,
+      text: lines.join('\n'),
+      html: `<div style="background:#111;color:#fff;font-family:Arial,sans-serif;padding:28px"><p style="color:#16c7f3;font-size:12px;letter-spacing:1.6px;margin:0 0 12px;text-transform:uppercase">Trap Houze Records</p><h1 style="font-size:24px;margin:0 0 22px">${escapeHtml(label)}</h1>${details}<p style="border-top:1px solid #3a3a3a;color:#aaa;font-size:12px;margin:22px 0 0;padding-top:16px">Enviado automaticamente pela agenda Trap Houze.</p></div>`
+    })
+  });
+  if (!response.ok) throw new Error(`Resend respondeu ${response.status}: ${(await response.text()).slice(0, 180)}`);
+  return true;
 }
 async function googleCalendarStatus(request, env) {
   const admin = await adminSession(request, env);
@@ -644,18 +728,21 @@ async function publicBooking(request, env) {
   const overlapsBlock = blocks.some(item => startsAt < bookingDateTime(item.date, item.endsAt) && endsAt > bookingDateTime(item.date, item.startsAt));
   if (overlapsBlock) return error('Este período está bloqueado pelo estúdio.', 409);
   if (!sessionClient && (!guestName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail))) return error('Indique o nome e um e-mail válido.');
-  const appointment = { clientId: sessionClient?.id || null, guestName: sessionClient ? null : guestName, guestPhone: null, guestEmail: sessionClient ? null : guestEmail, service, startsAt, endsAt, status: 'pending', notes };
+  const amountCents = Math.round(bookingService.pricePerHour * duration * 100);
+  const appointment = { clientId: sessionClient?.id || null, guestName: sessionClient ? null : guestName, guestPhone: null, guestEmail: sessionClient ? null : guestEmail, service, startsAt, endsAt, status: 'pending', amountCents, paymentStatus: 'pending', paymentUrl: null, notes };
   if (await hasAppointmentConflict(db, appointment)) return error('Este horário já não está disponível. Escolha outro, por favor.', 409);
   const id = randomId();
-  const statements = [db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, guest_email, service, starts_at, ends_at, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes)];
+  const statements = [db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, guest_email, service, starts_at, ends_at, status, amount_cents, payment_status, payment_url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.amountCents, appointment.paymentStatus, appointment.paymentUrl, appointment.notes)];
   if (sessionClient) {
-    statements.push(db.prepare("INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, 'pending', ?, NULL)").bind(randomId(), sessionClient.id, service, startsAt, Math.round(bookingService.pricePerHour * duration * 100)));
     statements.push(db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), sessionClient.id, `client:${sessionClient.id}`, 'booking.requested', JSON.stringify({ appointmentId: id, duration })));
   }
   await db.batch(statements);
+  await syncAppointmentBooking(db, id, appointment);
   let googleSynced = true;
   try { await googleSyncAppointment(env, db, { id, ...appointment }); } catch (caught) { console.warn('Google Calendar: reserva criada sem espelho', caught); googleSynced = false; }
-  return jsonResponse({ id, startsAt, endsAt, status: 'pending', googleSynced, client: sessionClient ? { name: sessionClient.name } : null }, 201);
+  let notificationSent = false;
+  try { notificationSent = await sendBookingNotification(env, { id, ...appointment }, { clientName: sessionClient?.name || guestName, clientEmail: sessionClient ? '' : guestEmail }); } catch (caught) { console.warn('E-mail: reserva criada sem notificação', caught); }
+  return jsonResponse({ id, startsAt, endsAt, status: 'pending', googleSynced, notificationSent, client: sessionClient ? { name: sessionClient.name } : null }, 201);
 }
 async function studioSchedule(request, env, appointmentId = '') {
   const admin = request.method === 'GET' ? await adminSession(request, env) : await requirePortalAdmin(request, env);
@@ -665,7 +752,7 @@ async function studioSchedule(request, env, appointmentId = '') {
     const url = new URL(request.url);
     const from = appointmentDate(url.searchParams.get('from') || new Date().toISOString(), 'Data inicial');
     const until = appointmentDate(url.searchParams.get('until') || new Date(Date.now() + 1000 * 60 * 60 * 24 * 31).toISOString(), 'Data final');
-    const appointments = await db.prepare("SELECT a.id, a.client_id AS clientId, COALESCE(c.display_name, a.guest_name) AS clientName, COALESCE(c.phone, a.guest_phone) AS clientPhone, a.service, a.starts_at AS startsAt, a.ends_at AS endsAt, a.status, a.notes, a.google_event_id AS googleEventId, 'studio' AS source FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id WHERE a.starts_at < ? AND a.ends_at > ? ORDER BY a.starts_at ASC").bind(until, from).all();
+    const appointments = await db.prepare("SELECT a.id, a.client_id AS clientId, COALESCE(c.display_name, a.guest_name) AS clientName, COALESCE(c.email, a.guest_email) AS clientEmail, a.service, a.starts_at AS startsAt, a.ends_at AS endsAt, a.status, a.notes, a.amount_cents AS amountCents, a.payment_status AS paymentStatus, a.payment_url AS paymentUrl, a.google_event_id AS googleEventId, 'studio' AS source FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id WHERE a.starts_at < ? AND a.ends_at > ? ORDER BY a.starts_at ASC").bind(until, from).all();
     for (const appointment of appointments.results) {
       if (!appointment.googleEventId && appointment.status !== 'cancelled') {
         try { appointment.googleEventId = await googleSyncAppointment(env, db, appointment); } catch (caught) { console.warn('Google Calendar: não foi possível sincronizar marcação existente', caught); }
@@ -684,20 +771,18 @@ async function studioSchedule(request, env, appointmentId = '') {
   }
   let body;
   try { body = await request.json(); } catch { return error('Pedido inválido.'); }
-  const appointment = await appointmentPayload(body, db);
+  let appointment = await appointmentPayload(body, db);
   if (await hasAppointmentConflict(db, appointment, appointmentId)) return error('Este horário entra em conflito com outra marcação.', 409);
+  appointment = await appointmentClient(db, appointment);
   const id = appointmentId || randomId();
   if (appointmentId) {
     const current = await db.prepare('SELECT id FROM studio_appointments WHERE id = ?').bind(id).first();
     if (!current) return error('Marcação não encontrada.', 404);
-    await db.prepare('UPDATE studio_appointments SET client_id = ?, guest_name = ?, guest_phone = ?, service = ?, starts_at = ?, ends_at = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes, id).run();
+    await db.prepare('UPDATE studio_appointments SET client_id = ?, guest_name = ?, guest_phone = ?, guest_email = ?, service = ?, starts_at = ?, ends_at = ?, status = ?, amount_cents = ?, payment_status = ?, payment_url = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.amountCents, appointment.paymentStatus, appointment.paymentUrl, appointment.notes, id).run();
   } else {
-    await db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, service, starts_at, ends_at, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.notes).run();
-    const pricedService = bookingServicesFromContent((await contentFromGitHub(env)).content).find(item => item.title === appointment.service);
-    const hours = Math.max(0, (new Date(`${appointment.endsAt.replace(' ', 'T')}Z`) - new Date(`${appointment.startsAt.replace(' ', 'T')}Z`)) / 3600000);
-    const amountCents = pricedService ? Math.round(pricedService.pricePerHour * hours * 100) : cents(body.amount || 0);
-    if (appointment.clientId) await db.prepare("INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, 'pending', ?, NULL)").bind(randomId(), appointment.clientId, appointment.service, appointment.startsAt, amountCents).run();
+    await db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, guest_email, service, starts_at, ends_at, status, amount_cents, payment_status, payment_url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.amountCents, appointment.paymentStatus, appointment.paymentUrl, appointment.notes).run();
   }
+  await syncAppointmentBooking(db, id, appointment);
   const currentGoogle = appointmentId ? await db.prepare('SELECT google_event_id AS googleEventId FROM studio_appointments WHERE id = ?').bind(id).first() : null;
   const synced = { id, ...appointment, googleEventId: currentGoogle?.googleEventId || '' };
   let googleSynced = true;
@@ -733,16 +818,17 @@ async function portalAdminMutation(request, env, resource, id) {
       return jsonResponse({ ok: true });
     }
     const name = String(body.name || '').trim();
+    const email = clientEmail(body.email);
     const phone = String(body.phone || '').replace(/\D/g, '');
     if (!name || (phone && !/^\d{9,15}$/.test(phone))) return error('Dados de cliente inválidos.');
     const active = body.active === false ? 0 : 1;
-    const statements = [db.prepare('UPDATE clients SET display_name = ?, phone = ?, active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(name, phone || null, active, id)];
+    const statements = [db.prepare('UPDATE clients SET display_name = ?, email = ?, phone = ?, active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(name, email, phone || null, active, id)];
     if (body.password) {
       const password = await passwordHash(String(body.password));
       statements.push(db.prepare('UPDATE clients SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(password.hash, password.salt, id));
       statements.push(db.prepare('DELETE FROM client_sessions WHERE client_id = ?').bind(id));
     }
-    await db.batch(statements);
+    try { await db.batch(statements); } catch (caught) { if (String(caught.message).includes('UNIQUE')) return error('Esse e-mail já pertence a outro cliente.', 409); throw caught; }
     await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), id, admin.login, 'client.updated').run();
     return jsonResponse(await portalData(id, env));
   }

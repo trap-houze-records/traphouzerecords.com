@@ -98,9 +98,9 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .schedule-toolbar button:not(.manager-copy) { width: 32px; height: 32px; border: 1px solid rgba(255,255,255,.18); background: transparent; color: #fff; cursor: pointer; font-size: 1.1rem; }
 .schedule-toolbar strong { min-width: 180px; color: rgba(255,255,255,.86); font-size: .86rem; text-align: center; text-transform: capitalize; }
 .schedule-toolbar .manager-copy { width: auto; margin: 0; padding: 10px 16px; }
-.schedule-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; padding-top: 26px; }
-.schedule-week { display: grid; grid-template-columns: repeat(7, minmax(120px, 1fr)); overflow-x: auto; border: 1px solid rgba(255,255,255,.12); }
-.schedule-day { min-height: 500px; border-right: 1px solid rgba(255,255,255,.1); padding: 12px; }
+.schedule-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); gap: 20px; padding-top: 20px; align-items: start; }
+.schedule-week { display: grid; grid-template-columns: repeat(7, minmax(110px, 1fr)); overflow-x: auto; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.018); }
+.schedule-day { min-height: 380px; border-right: 1px solid rgba(255,255,255,.1); padding: 14px 12px; }
 .schedule-day:last-child { border-right: 0; }
 .schedule-day > header { display: grid; gap: 4px; border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 12px; }
 .schedule-day > header span { color: rgba(255,255,255,.45); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; }
@@ -118,7 +118,7 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .schedule-event.status-cancelled time { color: #ff9b9b; }
 .schedule-event.external { border-style: dashed; cursor: default; }
 .schedule-event.external:hover { background: rgba(22,199,243,.06); }
-.schedule-form { align-self: start; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.035); padding: 22px; }
+.schedule-form { position: sticky; top: 18px; align-self: start; border: 1px solid rgba(255,255,255,.14); background: #151515; padding: 22px; }
 .schedule-form-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(255,255,255,.1); margin-bottom: 20px; padding-bottom: 14px; }
 .schedule-form-heading h3 { margin: 6px 0 0; font-size: 1.2rem; }
 .schedule-date-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -1185,6 +1185,7 @@ footer p {
 .manager-grid .client-card:first-child { grid-column: 1 / -1; grid-row: auto; order: 3; }
 .manager-grid .client-card:nth-child(2) { order: 1; }
 .manager-grid .client-card:nth-child(3) { order: 2; }
+.manager-grid .client-card:nth-child(4) { order: 4; }
 .manager-grid h3 { margin-bottom: 14px; font-size: .88rem; letter-spacing: .06em; text-transform: uppercase; }
 .manager-password { display: grid; grid-template-columns: 1fr auto; }
 .manager-password button { border: 1px solid rgba(255,255,255,.2); border-left: 0; background: #242424; color: #fff; cursor: pointer; padding: 0 10px; font-size: .76rem; }
@@ -1201,7 +1202,7 @@ footer p {
 .manager-record { border-top: 1px solid rgba(255,255,255,.1); padding-top: 15px; }
 .manager-record-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .manager-record-top button { border: 0; background: transparent; color: rgba(255,255,255,.6); cursor: pointer; font-size: 1.3rem; }
-.manager-record-grid { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: end; }
+.manager-record-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: end; }
 .manager-item { display: flex; align-items: start; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.1); }
 .manager-item p { margin-top: 5px; color: rgba(255,255,255,.58); font-size: .8rem; }
 .manager-item button { border: 0; background: transparent; color: rgba(255,255,255,.6); cursor: pointer; font-size: 1.3rem; }
@@ -1265,7 +1266,7 @@ footer p {
     .schedule-layout { grid-template-columns: 1fr; }
     .schedule-week { grid-template-columns: repeat(7, minmax(150px, 1fr)); }
     .schedule-day { min-height: 260px; }
-    .schedule-form { max-width: none; }
+    .schedule-form { position: static; max-width: none; }
     .booking-shell { width: min(100% - 28px, 1120px); }
     .booking-intro { padding: 42px 0 26px; }
     .booking-panel-head, .booking-topbar { align-items: flex-start; flex-direction: column; }

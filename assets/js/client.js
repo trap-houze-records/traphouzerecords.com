@@ -24,12 +24,12 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ 
 const stages = [['start', 'Iniciar'], ['mix', 'Mix'], ['master', 'Master']];
 const money = value => `${Number(value || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 function normalisePortal(data) {
-  const appointments = (data.appointments || []).map(item => ({ id: item.id, appointmentId: item.id, date: item.startsAt || 'A confirmar', time: item.endsAt ? `${String(item.startsAt || '').slice(11, 16)} — ${String(item.endsAt).slice(11, 16)}` : '', service: item.service, paid: false, amount: 0, paymentUrl: '' }));
-  const appointmentKeys = new Set(appointments.map(item => `${item.service}|${item.date}`));
+  const appointments = (data.appointments || []).map(item => ({ id: item.id, appointmentId: item.id, date: item.startsAt || 'A confirmar', time: item.endsAt ? `${String(item.startsAt || '').slice(11, 16)} — ${String(item.endsAt).slice(11, 16)}` : '', service: item.service, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' }));
+  const linkedAppointments = new Set((data.bookings || []).map(item => item.appointmentId).filter(Boolean));
   return {
     client: data.client.name,
     tracks: (data.tracks || []).map(item => ({ title: item.title, stage: item.stage, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '', samplyUrl: item.samplyUrl || '' })),
-    bookings: [...appointments, ...(data.bookings || []).filter(item => !appointmentKeys.has(`${item.service}|${item.startsAt || 'A confirmar'}`)).map(item => ({ id: item.id, date: item.startsAt || 'A confirmar', time: '', service: item.service, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' }))]
+    bookings: [...appointments, ...(data.bookings || []).filter(item => !linkedAppointments.has(item.appointmentId)).map(item => ({ id: item.id, date: item.startsAt || 'A confirmar', time: '', service: item.service, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' }))]
   };
 }
 async function apiRequest(path, options = {}) {

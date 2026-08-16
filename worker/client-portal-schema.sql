@@ -5,6 +5,7 @@ CREATE TABLE clients (
   id TEXT PRIMARY KEY,
   display_name TEXT NOT NULL,
   username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  email TEXT UNIQUE COLLATE NOCASE,
   phone TEXT,
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
@@ -46,6 +47,7 @@ CREATE TABLE client_bookings (
   payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid')),
   amount_cents INTEGER NOT NULL DEFAULT 0 CHECK (amount_cents >= 0),
   payment_url TEXT,
+  appointment_id TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -62,6 +64,9 @@ CREATE TABLE studio_appointments (
   starts_at TEXT NOT NULL,
   ends_at TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'cancelled')),
+  amount_cents INTEGER NOT NULL DEFAULT 0 CHECK (amount_cents >= 0),
+  payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid')),
+  payment_url TEXT,
   notes TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -71,6 +76,7 @@ CREATE TABLE studio_appointments (
 
 CREATE INDEX studio_appointments_starts_at ON studio_appointments(starts_at);
 CREATE INDEX studio_appointments_client_id ON studio_appointments(client_id);
+CREATE UNIQUE INDEX client_bookings_appointment_unique ON client_bookings(appointment_id) WHERE appointment_id IS NOT NULL;
 
 CREATE TABLE google_calendar_connection (
   id INTEGER PRIMARY KEY CHECK (id = 1),
