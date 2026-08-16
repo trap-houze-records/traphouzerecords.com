@@ -463,6 +463,10 @@ async function financeSummary(request, env) {
     SELECT t.id, t.client_id AS clientId, c.display_name AS clientName, 'track' AS type, t.title AS description, t.stage, t.payment_status AS paymentStatus, t.amount_cents AS amountCents, t.payment_url AS paymentUrl, t.created_at AS createdAt
     FROM client_tracks t JOIN clients c ON c.id = t.client_id
     UNION ALL
+    SELECT a.id, COALESCE(a.client_id, 'guest:' || a.id) AS clientId, COALESCE(c.display_name, a.guest_name, 'Cliente') AS clientName, 'appointment' AS type, a.service AS description, NULL AS stage, a.payment_status AS paymentStatus, a.amount_cents AS amountCents, a.payment_url AS paymentUrl, a.starts_at AS createdAt
+    FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id
+    WHERE a.status != 'cancelled'
+    UNION ALL
     SELECT b.id, b.client_id AS clientId, c.display_name AS clientName, 'booking' AS type, b.service AS description, NULL AS stage, b.payment_status AS paymentStatus, b.amount_cents AS amountCents, b.payment_url AS paymentUrl, COALESCE(b.starts_at, b.created_at) AS createdAt
     FROM client_bookings b JOIN clients c ON c.id = b.client_id
     WHERE b.appointment_id IS NULL
@@ -494,7 +498,7 @@ async function dashboardSummary(request, env) {
   const today = now.toISOString().slice(0, 10);
   const [clients, finance, appointments, upcoming, activity] = await db.batch([
     db.prepare('SELECT COUNT(*) AS count FROM clients WHERE active = 1'),
-    db.prepare(`SELECT COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount_cents ELSE 0 END), 0) AS paid, COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN amount_cents ELSE 0 END), 0) AS pending FROM (SELECT payment_status, amount_cents FROM client_tracks WHERE substr(created_at, 1, 7) = ? UNION ALL SELECT payment_status, amount_cents FROM client_bookings WHERE substr(COALESCE(starts_at, created_at), 1, 7) = ?)` ).bind(month, month),
+    db.prepare(`SELECT COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount_cents ELSE 0 END), 0) AS paid, COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN amount_cents ELSE 0 END), 0) AS pending FROM (SELECT payment_status, amount_cents FROM client_tracks WHERE substr(created_at, 1, 7) = ? UNION ALL SELECT payment_status, amount_cents FROM studio_appointments WHERE status != 'cancelled' AND substr(starts_at, 1, 7) = ? UNION ALL SELECT payment_status, amount_cents FROM client_bookings WHERE appointment_id IS NULL AND substr(COALESCE(starts_at, created_at), 1, 7) = ?)` ).bind(month, month, month),
     db.prepare("SELECT COUNT(*) AS count, COALESCE(SUM((julianday(ends_at) - julianday(starts_at)) * 24), 0) AS hours FROM studio_appointments WHERE status != 'cancelled' AND substr(starts_at, 1, 7) = ?").bind(month),
     db.prepare("SELECT a.id, COALESCE(c.display_name, a.guest_name, 'Cliente') AS clientName, a.service, a.starts_at AS startsAt, a.ends_at AS endsAt, a.status FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id WHERE a.status != 'cancelled' AND a.starts_at >= ? ORDER BY a.starts_at ASC LIMIT 5").bind(`${today} 00:00`),
     db.prepare("SELECT l.action, l.created_at AS createdAt, COALESCE(c.display_name, 'Cliente removido') AS clientName FROM client_audit_log l LEFT JOIN clients c ON c.id = l.client_id ORDER BY l.created_at DESC LIMIT 6")

@@ -147,7 +147,11 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 
 /* Resumo financeiro */
 .finance { max-width: 1240px; }
-.finance-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid rgba(255,255,255,.14); margin-bottom: 28px; }
+.finance-heading { align-items: end; border-bottom: 1px solid rgba(255,255,255,.12); display: flex; justify-content: space-between; gap: 24px; margin-bottom: 18px; padding-bottom: 18px; }
+.finance-heading h2 { margin: 4px 0 6px; font-size: clamp(1.55rem, 3vw, 2.4rem); letter-spacing: -.04em; }
+.finance-heading p:not(.eyebrow), .finance-heading > span { color: rgba(255,255,255,.54); font-size: .82rem; }
+.finance-heading > span { border: 1px solid rgba(22,199,243,.4); color: #16c7f3; padding: 7px 10px; white-space: nowrap; }
+.finance-totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid rgba(255,255,255,.14); margin-bottom: 22px; }
 .finance-totals article { display: grid; gap: 8px; min-height: 150px; border-right: 1px solid rgba(255,255,255,.12); padding: 24px; }
 .finance-totals article:last-child { border-right: 0; }
 .finance-totals span, .finance-totals small { color: rgba(255,255,255,.55); font-size: .75rem; }
@@ -1257,6 +1261,7 @@ footer p {
     .dashboard-live { grid-template-columns: 1fr; }
     .dashboard-session-list > div { grid-template-columns: 74px minmax(0, 1fr); }
     .dashboard-session-list b { grid-column: 2; }
+    .finance-heading { align-items: start; flex-direction: column; }
     .finance-totals, .finance-grid { grid-template-columns: 1fr; }
     .finance-totals article { border-bottom: 1px solid rgba(255,255,255,.12); border-right: 0; min-height: 0; }
     .finance-totals article:last-child { border-bottom: 0; }
