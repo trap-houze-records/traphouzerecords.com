@@ -1,6 +1,7 @@
 window.ClientAdminModule = (() => {
   const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
-  const money = cents => (Number(cents || 0) / 100).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Campos type="number" aceitam ponto decimal; a vírgula portuguesa torna o valor inválido e vazio.
+  const numericAmount = cents => (Number(cents || 0) / 100).toFixed(2);
 
   function mount(root, options) {
     const apiBase = options.apiBase;
@@ -44,7 +45,7 @@ window.ClientAdminModule = (() => {
         <div class="manager-record-top"><strong>${track ? 'Música' : 'Reserva'}</strong><button type="button" data-delete="${type}" data-id="${item.id}" aria-label="Remover">×</button></div>
         <label class="admin-field"><span>${label}</span><input data-field="${name}" value="${escapeHtml(item[name])}"></label>
         ${track ? `<label class="admin-field"><span>Fase</span><select data-field="stage">${[['start', 'Iniciar'], ['mix', 'Mix'], ['master', 'Master']].map(([value, text]) => `<option value="${value}" ${item.stage === value ? 'selected' : ''}>${text}</option>`).join('')}</select></label>` : `<label class="admin-field"><span>Data e hora</span><input type="datetime-local" data-field="startsAt" value="${escapeHtml((item.startsAt || '').replace(' ', 'T').slice(0, 16))}"></label>`}
-        <label class="admin-field"><span>Valor (€)</span><input type="number" step="0.01" min="0" data-field="amount" value="${money(item.amountCents)}"></label>
+        <label class="admin-field"><span>Valor (€)</span><input type="number" step="0.01" min="0" data-field="amount" value="${numericAmount(item.amountCents)}"></label>
        <label class="admin-field"><span>Link de pagamento</span><input type="url" data-field="paymentUrl" value="${escapeHtml(item.paymentUrl || '')}" placeholder="https://"></label>
         ${track ? `<label class="admin-field"><span>Player Samply</span><textarea rows="3" data-field="samplyUrl" placeholder="<iframe src=&quot;https://samply.app/embed/...&quot; ...></iframe>">${escapeHtml(item.samplyUrl || '')}</textarea><small>Cola aqui o código Embed copiado do Samply. Guardamos automaticamente o link seguro do player.</small></label>` : ''}
        <label class="admin-check"><input type="checkbox" data-field="paymentStatus" ${item.paymentStatus === 'paid' ? 'checked' : ''}><span>Pagamento confirmado</span></label>
@@ -56,7 +57,7 @@ window.ClientAdminModule = (() => {
         <div class="manager-record-top"><strong>Marcação na agenda</strong><button type="button" data-delete-appointment="${item.id}" aria-label="Apagar marcação">×</button></div>
         <label class="admin-field"><span>Serviço</span><input data-appointment-field="service" value="${escapeHtml(item.service)}"></label>
         <div class="manager-record-grid"><label class="admin-field"><span>Início</span><input type="datetime-local" data-appointment-field="startsAt" value="${escapeHtml((item.startsAt || '').replace(' ', 'T').slice(0, 16))}"></label><label class="admin-field"><span>Fim</span><input type="datetime-local" data-appointment-field="endsAt" value="${escapeHtml((item.endsAt || '').replace(' ', 'T').slice(0, 16))}"></label></div>
-        <div class="manager-record-grid"><label class="admin-field"><span>Valor (€)</span><input type="number" step="0.01" min="0" data-appointment-field="amount" value="${money(item.amountCents)}"></label><label class="admin-field"><span>Pagamento</span><select data-appointment-field="paymentStatus"><option value="pending" ${item.paymentStatus !== 'paid' ? 'selected' : ''}>Pendente</option><option value="paid" ${item.paymentStatus === 'paid' ? 'selected' : ''}>Confirmado</option></select></label></div>
+        <div class="manager-record-grid"><label class="admin-field"><span>Valor (€)</span><input type="number" step="0.01" min="0" data-appointment-field="amount" value="${numericAmount(item.amountCents)}"></label><label class="admin-field"><span>Pagamento</span><select data-appointment-field="paymentStatus"><option value="pending" ${item.paymentStatus !== 'paid' ? 'selected' : ''}>Pendente</option><option value="paid" ${item.paymentStatus === 'paid' ? 'selected' : ''}>Confirmado</option></select></label></div>
         <label class="admin-field"><span>Link de pagamento</span><input type="url" data-appointment-field="paymentUrl" value="${escapeHtml(item.paymentUrl || '')}" placeholder="https://"></label>
         <label class="admin-field"><span>Estado da sessão</span><select data-appointment-field="status"><option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pendente</option><option value="confirmed" ${item.status === 'confirmed' ? 'selected' : ''}>Confirmada</option><option value="cancelled" ${item.status === 'cancelled' ? 'selected' : ''}>Cancelada</option></select></label>
         <label class="admin-field"><span>Notas</span><textarea rows="3" data-appointment-field="notes">${escapeHtml(item.notes || '')}</textarea></label>
