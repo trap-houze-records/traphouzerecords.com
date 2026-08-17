@@ -63,11 +63,19 @@ function sessionFromRequest(request, env) {
 function secureCookie(name, value, seconds) { return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${seconds}`; }
 function redirect(url, headers = {}) { return new Response(null, { status: 302, headers: { location: url, ...headers } }); }
 
+const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 async function github(request, path, options = {}) {
-  const response = await fetch(`https://api.github.com${path}`, { ...options, headers: { accept: 'application/vnd.github+json', 'user-agent': 'trap-houze-cms', 'x-github-api-version': '2022-11-28', ...options.headers } });
+  let response;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    response = await fetch(`https://api.github.com${path}`, { ...options, headers: { accept: 'application/vnd.github+json', 'user-agent': 'trap-houze-cms', 'x-github-api-version': '2022-11-28', ...options.headers } });
+    if (response.ok || ![429, 502, 503, 504].includes(response.status) || attempt === 2) break;
+    await wait(350 * (attempt + 1));
+  }
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`GitHub respondeu ${response.status}: ${detail.slice(0, 240)}`);
+    const caught = new Error([429, 502, 503, 504].includes(response.status) ? 'O GitHub está temporariamente indisponível. Tente novamente dentro de instantes.' : `GitHub respondeu ${response.status}: ${detail.slice(0, 240)}`);
+    caught.status = [429, 502, 503, 504].includes(response.status) ? 503 : response.status;
+    throw caught;
   }
   return response;
 }
