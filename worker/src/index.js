@@ -210,16 +210,111 @@ async function requirePortalAdmin(request, env) {
   if (!user.csrf || request.headers.get('x-cms-csrf') !== user.csrf) return null;
   return user;
 }
+function artistProfileRow(row) {
+  if (!row) return null;
+  return {
+    clientId: row.clientId,
+    artistName: row.artistName,
+    image: row.image || '',
+    bio: row.bio || '',
+    instagram: row.instagram || '',
+    youtube: row.youtube || '',
+    spotify: row.spotify || '',
+    appleMusic: row.appleMusic || '',
+    updatedAt: row.updatedAt
+  };
+}
+function artistProfileUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:') throw new Error();
+    return url.toString();
+  } catch { throw inputError('Os links do artista devem usar HTTPS.'); }
+}
+function artistProfileSource(artist) {
+  const links = Array.isArray(artist?.links) ? artist.links : [];
+  const legacy = label => links.find(item => String(item?.label || '').trim().toLowerCase() === label.toLowerCase())?.url || '';
+  return {
+    artistName: String(artist?.name || 'Artista').trim().slice(0, 120) || 'Artista',
+    image: String(artist?.image || '').trim() || null,
+    bio: String(artist?.bio || '').trim() || null,
+    instagram: String(artist?.instagram || legacy('Instagram') || '').trim() || null,
+    youtube: String(artist?.youtube || legacy('YouTube') || '').trim() || null,
+    spotify: String(artist?.spotify || legacy('Spotify') || '').trim() || null,
+    appleMusic: String(artist?.appleMusic || legacy('Apple Music') || '').trim() || null
+  };
+}
+async function artistProfileForClient(clientId, env) {
+  const db = clientDb(env);
+  const existing = await db.prepare('SELECT client_id AS clientId, artist_name AS artistName, image, bio, instagram, youtube, spotify, apple_music AS appleMusic, updated_at AS updatedAt FROM artist_profiles WHERE client_id = ?').bind(clientId).first();
+  if (existing) return artistProfileRow(existing);
+  let artist;
+  try {
+    const content = (await contentFromGitHub(env)).content;
+    artist = (content.artists || []).find(item => String(item?.clientId || '') === clientId);
+  } catch (caught) {
+    console.warn('Perfil de artista: não foi possível confirmar a associação', caught);
+    return null;
+  }
+  if (!artist) return null;
+  const source = artistProfileSource(artist);
+  await db.prepare('INSERT OR IGNORE INTO artist_profiles (client_id, artist_name, image, bio, instagram, youtube, spotify, apple_music) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(clientId, source.artistName, source.image, source.bio, source.instagram, source.youtube, source.spotify, source.appleMusic).run();
+  const created = await db.prepare('SELECT client_id AS clientId, artist_name AS artistName, image, bio, instagram, youtube, spotify, apple_music AS appleMusic, updated_at AS updatedAt FROM artist_profiles WHERE client_id = ?').bind(clientId).first();
+  return artistProfileRow(created);
+}
+async function publicArtistProfiles(env) {
+  const rows = await clientDb(env).prepare('SELECT client_id AS clientId, artist_name AS artistName, image, bio, instagram, youtube, spotify, apple_music AS appleMusic, updated_at AS updatedAt FROM artist_profiles').all();
+  return jsonResponse({ profiles: rows.results.map(artistProfileRow) });
+}
+async function clientArtistProfile(request, env) {
+  const session = await clientSession(request, env);
+  if (!session) return error('Inicie sessão para editar o perfil.', 401);
+  const current = await artistProfileForClient(session.clientId, env);
+  if (!current) return error('Esta conta ainda não está associada a um artista exposto no site.', 404);
+  if (request.method === 'GET') return jsonResponse(current);
+  let body;
+  try { body = await request.json(); } catch { return error('Pedido inválido.'); }
+  const bio = String(body.bio || '').trim().slice(0, 2000) || null;
+  const instagram = artistProfileUrl(body.instagram);
+  const youtube = artistProfileUrl(body.youtube);
+  const spotify = artistProfileUrl(body.spotify);
+  const appleMusic = artistProfileUrl(body.appleMusic);
+  const db = clientDb(env);
+  await db.prepare('UPDATE artist_profiles SET bio = ?, instagram = ?, youtube = ?, spotify = ?, apple_music = ?, updated_at = CURRENT_TIMESTAMP WHERE client_id = ?').bind(bio, instagram, youtube, spotify, appleMusic, session.clientId).run();
+  await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'artist_profile.updated').run();
+  return jsonResponse(await artistProfileForClient(session.clientId, env));
+}
+async function clientArtistImage(request, env) {
+  const session = await clientSession(request, env);
+  if (!session) return error('Inicie sessão para atualizar a fotografia.', 401);
+  const profile = await artistProfileForClient(session.clientId, env);
+  if (!profile) return error('Esta conta ainda não está associada a um artista exposto no site.', 404);
+  const form = await request.formData();
+  const file = form.get('image');
+  const allowed = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif' };
+  if (!(file instanceof File) || !allowed[file.type]) return error('Use uma imagem JPG, PNG, WebP ou AVIF.');
+  if (file.size > 5 * 1024 * 1024) return error('A imagem não pode ultrapassar 5 MB.');
+  const label = profile.artistName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'artista';
+  const path = `images/artists/${label}-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${allowed[file.type]}`;
+  const token = await installationToken(env);
+  await github(null, `/repos/${env.REPO_OWNER}/${env.REPO_NAME}/contents/${path}`, { method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ message: `media: fotografia de artista atualizada`, branch: env.BRANCH, content: bytesToBase64(new Uint8Array(await file.arrayBuffer())) }) });
+  await clientDb(env).prepare('UPDATE artist_profiles SET image = ?, updated_at = CURRENT_TIMESTAMP WHERE client_id = ?').bind(path, session.clientId).run();
+  await clientDb(env).prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'artist_profile.image_updated').run();
+  return jsonResponse(await artistProfileForClient(session.clientId, env), 201);
+}
 async function portalData(clientId, env) {
   const db = clientDb(env);
   const client = await db.prepare('SELECT id, display_name AS name, username, email, phone, active FROM clients WHERE id = ?').bind(clientId).first();
   if (!client) return null;
+  const artistProfile = await artistProfileForClient(clientId, env);
   const [tracks, bookings, appointments] = await db.batch([
     db.prepare("SELECT id, title, stage, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl, samply_url AS samplyUrl FROM client_tracks WHERE client_id = ? ORDER BY created_at DESC").bind(clientId),
     db.prepare("SELECT id, appointment_id AS appointmentId, service, starts_at AS startsAt, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl FROM client_bookings WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId),
     db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, amount_cents AS amountCents, payment_status AS paymentStatus, payment_url AS paymentUrl FROM studio_appointments WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId)
   ]);
-  return { client, tracks: tracks.results, bookings: bookings.results, appointments: appointments.results };
+  return { client, tracks: tracks.results, bookings: bookings.results, appointments: appointments.results, artistProfile };
 }
 async function clientLogin(request, env) {
   let body;
@@ -259,7 +354,7 @@ async function clientAppointment(request, env, appointmentId) {
   const date = bookingDate(body.date);
   const time = bookingTime(body.time);
   const duration = Number(body.duration);
-  if (!Number.isInteger(duration) || duration < 1 || duration > 10) return error('A duração deve estar entre 1 e 10 horas.');
+  if (!Number.isFinite(duration) || duration < 2 || duration > 10 || Math.round(duration * 2) !== duration * 2) return error('A duração deve estar entre 2 e 10 horas, em blocos de 30 minutos.');
   if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
   const startsAt = `${date} ${time}`;
   const endsAt = bookingEnd(startsAt, duration);
@@ -716,7 +811,7 @@ async function publicBooking(request, env) {
   const date = bookingDate(body.date);
   const time = bookingTime(body.time);
   const duration = Number(body.duration);
-  if (!Number.isInteger(duration) || duration < 1 || duration > 10) return error('A duração deve ser entre 1 e 10 horas.');
+  if (!Number.isFinite(duration) || duration < 2 || duration > 10 || Math.round(duration * 2) !== duration * 2) return error('A duração deve ser entre 2 e 10 horas, em blocos de 30 minutos.');
   if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
   const startsAt = `${date} ${time}`;
   const endsAt = bookingEnd(startsAt, duration);
@@ -912,6 +1007,9 @@ export default {
       else if (url.pathname === '/client/auth/login' && request.method === 'POST') response = await clientLogin(request, env);
       else if (url.pathname === '/client/auth/logout' && request.method === 'POST') response = await clientLogout(request, env);
       else if (url.pathname === '/client/portal' && request.method === 'GET') response = await clientPortal(request, env);
+      else if (url.pathname === '/client/artist-profile' && ['GET', 'PATCH'].includes(request.method)) response = await clientArtistProfile(request, env);
+      else if (url.pathname === '/client/artist-image' && request.method === 'POST') response = await clientArtistImage(request, env);
+      else if (url.pathname === '/artists/profiles' && request.method === 'GET') response = await publicArtistProfiles(env);
       else if (/^\/client\/appointments\/[0-9a-f-]{36}$/i.test(url.pathname) && ['GET', 'PATCH'].includes(request.method)) response = await clientAppointment(request, env, url.pathname.split('/').pop());
       else if (url.pathname === '/google-calendar/status' && request.method === 'GET') response = await googleCalendarStatus(request, env);
       else if (url.pathname === '/google-calendar/connect' && request.method === 'POST') response = await googleCalendarConnect(request, env);

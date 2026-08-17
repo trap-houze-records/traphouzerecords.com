@@ -8,6 +8,7 @@ const safeUrl = value => {
   try { const url = new URL(raw); return ['https:', 'http:'].includes(url.protocol) ? url.toString() : ''; } catch { return ''; }
 };
 const artistPlatforms = [['Instagram', 'instagram'], ['YouTube', 'youtube'], ['Spotify', 'spotify'], ['Apple Music', 'applemusic']];
+const publicApiBase = String(window.CMS_API_URL || '').replace(/\/$/, '');
 const spotifyPlaylistEmbed = value => {
   const url = safeUrl(value);
   const match = url.match(/^https:\/\/open\.spotify\.com\/playlist\/([A-Za-z0-9]+)(?:\?.*)?$/i);
@@ -92,6 +93,8 @@ function openBooking(service) {
 }
 function showArtist(index) {
   const artist = content.artists[index];
+  const showBio = artist.showBio !== false;
+  const showLinks = artist.showLinks !== false;
   const links = Array.isArray(artist.links) ? artist.links : [];
   const platformProperties = { Instagram: 'instagram', YouTube: 'youtube', Spotify: 'spotify', 'Apple Music': 'appleMusic' };
   const platformLinks = artistPlatforms.map(([label, icon]) => {
@@ -104,8 +107,12 @@ function showArtist(index) {
   const catalogMarkup = playlist
     ? `<article class="artist-catalog-playlist"><div><strong>Playlist Spotify</strong><small>Catálogo Trap Houze · ${escapeHtml(artist.name)}</small></div><iframe src="${escapeHtml(playlist)}" title="Playlist Spotify: ${escapeHtml(artist.name)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></article>`
     : '<p>A playlist Spotify deste artista será disponibilizada em breve.</p>';
+  const profileMarkup = showBio
+    ? `<div class="artist-modal-profile"><img class="artist-modal-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div><p class="artist-modal-genre">${escapeHtml(artist.genre || 'Artista Trap Houze Records')}</p><p class="artist-modal-bio">${escapeHtml(artist.bio || 'Perfil em atualização.')}</p></div></div>`
+    : `<div class="artist-modal-profile artist-modal-profile-compact"><img class="artist-modal-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"></div>`;
+  const linksMarkup = showLinks ? `<section class="artist-modal-section"><h4>Ouvir e seguir</h4><div class="artist-links">${platformLinks}</div></section>` : '';
   document.getElementById('artistModalTitle').textContent = artist.name;
-  document.getElementById('artistModalBody').innerHTML = `<div class="artist-modal-profile"><img class="artist-modal-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div><p class="artist-modal-genre">${escapeHtml(artist.genre || 'Artista Trap Houze Records')}</p><p class="artist-modal-bio">${escapeHtml(artist.bio || 'Perfil em atualização.')}</p></div></div><section class="artist-modal-section"><h4>Ouvir e seguir</h4><div class="artist-links">${platformLinks}</div></section><section class="artist-modal-section"><h4>Catálogo Trap Houze</h4><div class="artist-catalog">${catalogMarkup}</div></section>`;
+  document.getElementById('artistModalBody').innerHTML = `${profileMarkup}${linksMarkup}<section class="artist-modal-section"><h4>Catálogo Trap Houze</h4><div class="artist-catalog">${catalogMarkup}</div></section>`;
   const modal = document.getElementById('artistModal');
   modal.classList.add('active'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
 }
@@ -134,4 +141,19 @@ function bindEvents() {
 }
 function startSlides() { setInterval(() => { const slides = document.querySelectorAll('.slide'); if (!slides.length) return; slides[activeSlide].classList.remove('active'); activeSlide = (activeSlide + 1) % slides.length; slides[activeSlide].classList.add('active'); }, 5000); }
 
-fetch('data/site.json', { cache: 'no-store' }).then(response => { if (!response.ok) throw new Error('Não foi possível carregar o conteúdo.'); return response.json(); }).then(data => { content = data; renderSite(); bindEvents(); startSlides(); const script = document.createElement('script'); script.src = 'https://asset-tidycal.b-cdn.net/js/embed.js'; script.async = true; document.body.appendChild(script); }).catch(error => { document.getElementById('site').innerHTML = `<main class="site-error">${escapeHtml(error.message)}</main>`; console.error(error); });
+async function mergeArtistProfiles(data) {
+  if (!publicApiBase || !Array.isArray(data.artists) || !data.artists.some(artist => artist.clientId)) return data;
+  try {
+    const response = await fetch(`${publicApiBase}/artists/profiles`, { cache: 'no-store' });
+    if (!response.ok) return data;
+    const result = await response.json();
+    const profiles = new Map((result.profiles || []).map(profile => [String(profile.clientId || ''), profile]));
+    data.artists = data.artists.map(artist => {
+      const profile = profiles.get(String(artist.clientId || ''));
+      return profile ? { ...artist, image: profile.image || artist.image, bio: profile.bio || '', instagram: profile.instagram || '', youtube: profile.youtube || '', spotify: profile.spotify || '', appleMusic: profile.appleMusic || '' } : artist;
+    });
+  } catch { /* O site continua funcional se a área privada estiver indisponível. */ }
+  return data;
+}
+
+fetch('data/site.json', { cache: 'no-store' }).then(response => { if (!response.ok) throw new Error('Não foi possível carregar o conteúdo.'); return response.json(); }).then(mergeArtistProfiles).then(data => { content = data; renderSite(); bindEvents(); startSlides(); const script = document.createElement('script'); script.src = 'https://asset-tidycal.b-cdn.net/js/embed.js'; script.async = true; document.body.appendChild(script); }).catch(error => { document.getElementById('site').innerHTML = `<main class="site-error">${escapeHtml(error.message)}</main>`; console.error(error); });

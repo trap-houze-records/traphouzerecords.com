@@ -23,14 +23,21 @@ if (apiToken) {
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const stages = [['start', 'Iniciar'], ['mix', 'Mix'], ['master', 'Master']];
 const money = value => `${Number(value || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const profileImage = value => /^(?:\/?images\/[-a-zA-Z0-9_./]+|https:\/\/[^\s]+)$/i.test(String(value || '')) ? String(value) : '/images/Logo.png';
 function normalisePortal(data) {
   const appointments = (data.appointments || []).map(item => ({ id: item.id, appointmentId: item.id, date: item.startsAt || 'A confirmar', time: item.endsAt ? `${String(item.startsAt || '').slice(11, 16)} — ${String(item.endsAt).slice(11, 16)}` : '', service: item.service, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' }));
   const linkedAppointments = new Set((data.bookings || []).map(item => item.appointmentId).filter(Boolean));
   return {
     client: data.client.name,
+    artistProfile: data.artistProfile || null,
     tracks: (data.tracks || []).map(item => ({ title: item.title, stage: item.stage, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '', samplyUrl: item.samplyUrl || '' })),
     bookings: [...appointments, ...(data.bookings || []).filter(item => !linkedAppointments.has(item.appointmentId)).map(item => ({ id: item.id, date: item.startsAt || 'A confirmar', time: '', service: item.service, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' }))]
   };
+}
+
+function renderArtistProfile(profile) {
+  if (!profile) return '';
+  return `<section class="client-artist-profile"><div class="booking-section-heading"><div><p class="eyebrow">Perfil público</p><h2>O teu perfil de artista</h2></div><span>Visível no site</span></div><div class="client-artist-profile-body"><div class="client-artist-photo"><img src="${escapeHtml(profileImage(profile.image))}" alt="Fotografia de ${escapeHtml(profile.artistName || clientData.client)}"><label>Atualizar fotografia<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" data-artist-profile-image></label></div><form id="artistProfileForm" class="client-artist-form"><p>Atualiza a biografia e os links. A Trap Houze mantém o catálogo e escolhe o que fica visível no perfil público.</p><label>Biografia<textarea name="bio" rows="4" maxlength="2000">${escapeHtml(profile.bio || '')}</textarea></label><div><label>Instagram<input name="instagram" type="url" placeholder="https://instagram.com/..." value="${escapeHtml(profile.instagram || '')}"></label><label>YouTube<input name="youtube" type="url" placeholder="https://youtube.com/..." value="${escapeHtml(profile.youtube || '')}"></label><label>Spotify<input name="spotify" type="url" placeholder="https://open.spotify.com/..." value="${escapeHtml(profile.spotify || '')}"></label><label>Apple Music<input name="appleMusic" type="url" placeholder="https://music.apple.com/..." value="${escapeHtml(profile.appleMusic || '')}"></label></div><button type="submit">Guardar perfil <span>→</span></button><small id="artistProfileNotice" role="status"></small></form></div></section>`;
 }
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, { ...options, headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {}), ...options.headers } });
@@ -96,6 +103,7 @@ const bookings = splitBookings(clientData.bookings);
 portal.innerHTML = `<div class="client-shell client-simple">
   <header class="client-header"><a class="client-brand" href="/" aria-label="Trap Houze Records"><img src="/images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div class="client-user"><span>Olá, ${escapeHtml(clientData.client)}</span>${apiBase ? '<a class="client-book-session" href="/booking.html">Agendar sessão</a>' : ''}<button class="client-signout" type="button">Sair</button></div></header>
   <section class="client-simple-hero"><p class="eyebrow">O teu trabalho</p><h1>A tua agenda</h1><p>Reservas, músicas e pagamentos num só lugar.</p>${outstanding ? `<div class="client-total-due"><span>Total em falta</span><strong>${money(outstanding)}</strong></div>` : ''}</section>
+  ${renderArtistProfile(clientData.artistProfile)}
   <section class="booking-section booking-section-upcoming"><div class="booking-section-heading"><div><p class="eyebrow">Próximas sessões</p><h2>Reservas futuras</h2></div><span>${bookings.upcoming.length} agendadas</span></div><div class="booking-list">${bookings.upcoming.map(renderBooking).join('') || '<p class="client-empty">Ainda não tens reservas futuras.</p>'}</div></section>
   <section class="track-section"><div class="booking-section-heading"><div><p class="eyebrow">Música</p><h2>As tuas músicas</h2></div><span>${clientData.tracks.length} registadas</span></div><div class="track-list">${clientData.tracks.map(renderTrack).join('') || '<p class="client-empty">Ainda não tens músicas registadas.</p>'}</div></section>
   <section class="booking-section booking-section-history"><div class="booking-section-heading"><div><p class="eyebrow">Histórico</p><h2>Reservas anteriores</h2></div><span>${bookings.history.length} concluídas</span></div><div class="booking-list">${bookings.history.map(renderBooking).join('') || '<p class="client-empty">Ainda não existem reservas anteriores.</p>'}</div></section>
@@ -146,6 +154,41 @@ document.addEventListener('click', event => {
     if (apiBase && apiToken) apiRequest('/client/auth/logout', { method: 'POST' }).catch(() => {}).finally(() => { apiToken = ''; localStorage.removeItem(clientTokenKey); sessionStorage.removeItem(clientTokenKey); renderLogin(); });
     else renderLogin();
   }
+});
+
+document.addEventListener('submit', event => {
+  if (event.target.id !== 'artistProfileForm') return;
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const button = event.target.querySelector('button[type="submit"]');
+  const note = document.getElementById('artistProfileNotice');
+  button.disabled = true;
+  if (note) note.textContent = 'A guardar…';
+  apiRequest('/client/artist-profile', { method: 'PATCH', body: JSON.stringify(Object.fromEntries(form)) }).then(profile => {
+    clientData.artistProfile = profile;
+    renderPortal();
+  }).catch(error => {
+    button.disabled = false;
+    if (note) note.textContent = error.message;
+  });
+});
+
+document.addEventListener('change', event => {
+  if (!event.target.matches('[data-artist-profile-image]')) return;
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('image', file);
+  const note = document.getElementById('artistProfileNotice');
+  if (note) note.textContent = 'A enviar fotografia…';
+  fetch(`${apiBase}/client/artist-image`, { method: 'POST', headers: apiToken ? { Authorization: `Bearer ${apiToken}` } : {}, body: form }).then(async response => {
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Não foi possível atualizar a fotografia.');
+    return result;
+  }).then(profile => {
+    clientData.artistProfile = profile;
+    renderPortal();
+  }).catch(error => { if (note) note.textContent = error.message; });
 });
 
 function loadClients() {
