@@ -53,13 +53,13 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .admin-module-intro { padding-top: 20px; }
 
 /* Painel unificado — visão operacional */
-.admin-ready .admin-shell { width: min(1400px, calc(100% - 48px)); display: grid; grid-template-columns: 210px minmax(0, 1fr); grid-template-areas: "topbar intro" "modules workspace"; column-gap: 42px; padding-top: 0; }
+.admin-ready .admin-shell { width: min(1400px, calc(100% - 48px)); display: grid; grid-template-columns: 210px minmax(0, 1fr); grid-template-areas: "topbar workspace" "modules workspace"; grid-template-rows: auto 1fr; column-gap: 42px; padding-top: 0; }
 .admin-ready .admin-topbar { grid-area: topbar; align-self: stretch; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 34px; border: 0; border-right: 1px solid rgba(255,255,255,.12); padding: 28px 24px 28px 0; }
 .admin-ready .admin-topbar > div { margin-top: auto; align-items: flex-start; flex-direction: column; }
 .admin-ready .admin-topbar #authStatus { max-width: 160px; line-height: 1.45; }
-.admin-ready .admin-intro { grid-area: intro; padding: 24px 0 16px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.admin-ready .admin-intro { display: none; }
 .admin-ready .admin-intro h1 { font-size: clamp(2rem, 3vw, 3.2rem); letter-spacing: -.04em; text-transform: none; }
-.admin-ready .admin-workspace { grid-area: workspace; min-width: 0; padding-top: 14px; }
+.admin-ready .admin-workspace { grid-area: workspace; align-self: start; min-width: 0; padding-top: 28px; }
 .admin-ready .admin-notice { margin: 0; padding: 0 0 10px; }
 .admin-ready .admin-notice:empty { display: none; }
 .admin-ready .admin-modules { position: static; top: auto; z-index: auto; width: auto; min-height: 0; background: transparent; backdrop-filter: none; grid-area: modules; display: flex; flex-direction: column; align-items: stretch; gap: 4px; align-self: start; border: 0; padding: 4px 24px 0 0; margin: 0; }
@@ -1246,7 +1246,7 @@ footer p {
 
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1100px) and (min-width: 769px) {
-    .admin-ready .admin-shell { grid-template-columns: 175px minmax(0, 1fr); column-gap: 26px; width: min(100% - 40px, 1180px); }
+    .admin-ready .admin-shell { grid-template-columns: 175px minmax(0, 1fr); grid-template-areas: "topbar workspace" "modules workspace"; column-gap: 26px; width: min(100% - 40px, 1180px); }
     .admin-ready .admin-topbar { padding-right: 18px; }
     .admin-ready .admin-modules { padding-right: 18px; }
     .schedule-layout { grid-template-columns: 1fr; }
