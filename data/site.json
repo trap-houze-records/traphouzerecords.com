@@ -173,8 +173,8 @@
       "appleMusic": "",
       "spotifyPlaylist": "https://open.spotify.com/playlist/7q56qgHskQKwB9L9fW9JHi?si=VJiJnjKlQTm8N61pd8c1dg",
       "clientId": "",
-      "showBio": false,
-      "showLinks": false
+      "showBio": true,
+      "showLinks": true
     },
     {
       "name": "Abtonas",
