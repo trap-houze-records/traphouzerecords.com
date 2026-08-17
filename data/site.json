@@ -29,7 +29,7 @@
     {
       "id": "about",
       "label": "Quem somos",
-      "visible": false
+      "visible": true
     },
     {
       "id": "artists",
