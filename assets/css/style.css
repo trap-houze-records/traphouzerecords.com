@@ -860,10 +860,10 @@ section {
 }
 
 /* Perfil de artista */
-.artist-modal-content { max-width: 760px; }
+.artist-modal-content { max-width: 1080px; width: min(94vw, 1080px); }
 .artist-modal .modal-header { align-items: flex-start; }
 .artist-modal .modal-header .eyebrow { margin: 0 0 7px; }
-.artist-modal-body { display: grid; gap: 34px; }
+.artist-modal-body { display: grid; gap: 28px; padding: 30px 36px; }
 .artist-modal-profile { display: grid; gap: 24px; grid-template-columns: minmax(180px, .72fr) minmax(0, 1fr); }
 .artist-modal-profile-compact { grid-template-columns: minmax(180px, 330px); }
 .artist-modal-image { background: #121212; height: 265px; margin: 0; object-fit: cover; width: 100%; }
@@ -879,15 +879,15 @@ section {
 .artist-links img { height: 17px; object-fit: contain; width: 17px; }
 .artist-platform-disabled { align-items: center; border: 1px solid rgba(255,255,255,.13); color: rgba(255,255,255,.38); display: inline-flex; font-size: .78rem; gap: 8px; padding: 10px 12px; }
 .artist-platform-disabled img { height: 17px; object-fit: contain; width: 17px; }
-.artist-catalog { display: grid; border-top: 1px solid rgba(255,255,255,.08); }
+.artist-catalog { display: grid; border-top: 1px solid rgba(255,255,255,.08); width: 100%; }
 .artist-catalog article { align-items: center; border-bottom: 1px solid rgba(255,255,255,.08); display: flex; gap: 18px; justify-content: space-between; padding: 15px 0; }
 .artist-catalog article > div { display: grid; gap: 5px; }
 .artist-catalog strong { font-size: .92rem; font-weight: 500; }
 .artist-catalog small, .artist-catalog > p { color: rgba(255,255,255,.5); font-size: .74rem; }
 .artist-catalog a { color: #16c7f3; font-size: .74rem; text-decoration: none; }
 .artist-catalog article > span { color: rgba(255,255,255,.46); font-size: .72rem; }
-.artist-catalog .artist-catalog-playlist { align-items: stretch; display: grid; gap: 12px; padding: 20px 0; }
-.artist-catalog-playlist iframe { border: 0; border-radius: 12px; height: 352px; width: 100%; }
+.artist-catalog .artist-catalog-playlist { align-items: stretch; display: grid; gap: 12px; padding: 18px 0; width: 100%; }
+.artist-catalog-playlist iframe { border: 0; border-radius: 12px; display: block; height: 420px; min-width: 100%; width: 100%; }
 
 /* ========== AVALIAÇÕES ========== */
 .reviews {
