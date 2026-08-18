@@ -154,13 +154,15 @@ function renderSchedule() {
   $('#publishButton').hidden = true;
   $('#adminContent').innerHTML = '<div id="scheduleModuleRoot"></div>';
   window.StudioScheduleModule.mount($('#scheduleModuleRoot'), { apiBase, getToken: () => sessionToken, getCsrf: () => csrfToken, onError: error => notice(error.message, 'error'), onNotice: notice, saveBookingSchedule: async schedule => {
-    if (!draft) { const response = await fetch(`${apiBase}/content`, { cache: 'no-store' }); if (!response.ok) throw new Error('Não foi possível carregar a configuração da agenda.'); draft = await response.json(); }
-    draft.bookingSchedule = schedule;
-    const response = await fetch(`${apiBase}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CMS-CSRF': csrfToken, Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ content: draft }) });
-    const result = await response.json();
+    const contentResponse = await fetch(`${apiBase}/content?refresh=${Date.now()}`, { cache: 'no-store' });
+    const currentContent = await contentResponse.json().catch(() => null);
+    if (!contentResponse.ok || !currentContent) throw new Error('Não foi possível carregar a configuração atual da agenda.');
+    currentContent.bookingSchedule = schedule;
+    const response = await fetch(`${apiBase}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CMS-CSRF': csrfToken, Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ content: currentContent }) });
+    const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Não foi possível guardar a configuração da agenda.');
-    draft = result.content || draft;
-    notice('Regras da agenda guardadas.', 'success');
+    draft = result.content || currentContent;
+    return { commit: result.commit || '', schedule: draft.bookingSchedule };
   } }).catch(error => notice(error.message, 'error'));
 }
 async function loadArtistClientAccounts() {

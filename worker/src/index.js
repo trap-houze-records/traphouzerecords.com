@@ -116,14 +116,19 @@ function bookingScheduleFromContent(content) {
   const raw = content?.bookingSchedule && typeof content.bookingSchedule === 'object' ? content.bookingSchedule : {};
   const serviceRules = raw.serviceRules && typeof raw.serviceRules === 'object' ? raw.serviceRules : {};
   const blocks = Array.isArray(raw.blocks) ? raw.blocks : [];
-  const validTime = value => /^\d{2}:00$/.test(String(value || '')) ? String(value) : '';
+  const validTime = value => /^([01]\d|2[0-3]):(?:00|30)$/.test(String(value || '')) ? String(value) : '';
   const rule = item => {
     const source = serviceRules[item.id] && typeof serviceRules[item.id] === 'object' ? serviceRules[item.id] : {};
     const startsAt = validTime(source.startsAt) || defaultBookingAvailability.startsAt;
     const endsAt = validTime(source.endsAt) || defaultBookingAvailability.endsAt;
     const lunchStartsAt = validTime(source.lunchStartsAt) || defaultBookingAvailability.lunchStartsAt;
     const lunchEndsAt = validTime(source.lunchEndsAt) || defaultBookingAvailability.lunchEndsAt;
-    return { startsAt, endsAt, lunchStartsAt, lunchEndsAt, lunchEnabled: source.lunchEnabled !== undefined ? source.lunchEnabled !== false : item.id !== 'studio-rental', minNoticeHours: Math.max(0, Math.min(720, Number(source.minNoticeHours ?? defaultBookingAvailability.minNoticeHours) || 0)) };
+    const windowIsValid = startsAt < endsAt;
+    const availableStartsAt = windowIsValid ? startsAt : defaultBookingAvailability.startsAt;
+    const availableEndsAt = windowIsValid ? endsAt : defaultBookingAvailability.endsAt;
+    const lunchEnabled = source.lunchEnabled !== undefined ? source.lunchEnabled !== false : item.id !== 'studio-rental';
+    const lunchIsWithinAvailability = lunchStartsAt < lunchEndsAt && lunchStartsAt >= availableStartsAt && lunchEndsAt <= availableEndsAt;
+    return { startsAt: availableStartsAt, endsAt: availableEndsAt, lunchStartsAt, lunchEndsAt, lunchEnabled: lunchEnabled && lunchIsWithinAvailability, minNoticeHours: Math.max(0, Math.min(720, Number(source.minNoticeHours ?? defaultBookingAvailability.minNoticeHours) || 0)) };
   };
   return { serviceRules: Object.fromEntries(bookingServicesFromContent(content).map(item => [item.id, rule(item)])), blocks: blocks.map((item, index) => ({ id: String(item.id || `block-${index + 1}`), date: String(item.date || ''), startsAt: validTime(item.startsAt), endsAt: validTime(item.endsAt), label: String(item.label || 'Bloqueio').trim().slice(0, 120) })).filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.startsAt && item.endsAt && item.endsAt > item.startsAt) };
 }
@@ -979,7 +984,8 @@ async function publish(request, env) {
   const current = await contentFromGitHub(env);
   const response = await github(null, `/repos/${env.REPO_OWNER}/${env.REPO_NAME}/contents/${env.CONTENT_PATH}`, { method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ message: `content: publicação por ${user.login}`, branch: env.BRANCH, sha: current.sha, content: base64Text(JSON.stringify(payload.content, null, 2) + '\n') }) });
   const result = await response.json();
-  return jsonResponse({ commit: result.commit.sha });
+  if (!result?.commit?.sha) throw new Error('O GitHub não confirmou a publicação.');
+  return jsonResponse({ commit: result.commit.sha, content: payload.content });
 }
 async function uploadArtistImage(request, env) {
   const user = await sessionFromRequest(request, env);
