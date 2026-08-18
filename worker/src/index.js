@@ -123,12 +123,15 @@ function bookingScheduleFromContent(content) {
     const endsAt = validTime(source.endsAt) || defaultBookingAvailability.endsAt;
     const lunchStartsAt = validTime(source.lunchStartsAt) || defaultBookingAvailability.lunchStartsAt;
     const lunchEndsAt = validTime(source.lunchEndsAt) || defaultBookingAvailability.lunchEndsAt;
-    const windowIsValid = startsAt < endsAt;
+    // O aluguer pode usar 00:00–00:00 como abreviatura explícita de um dia inteiro.
+    // Para os restantes serviços, um intervalo que termina antes de começar continua inválido.
+    const fullDay = item.id === 'studio-rental' && startsAt === '00:00' && endsAt === '00:00';
+    const windowIsValid = startsAt < endsAt || fullDay;
     const availableStartsAt = windowIsValid ? startsAt : defaultBookingAvailability.startsAt;
     const availableEndsAt = windowIsValid ? endsAt : defaultBookingAvailability.endsAt;
     const lunchEnabled = source.lunchEnabled !== undefined ? source.lunchEnabled !== false : item.id !== 'studio-rental';
-    const lunchIsWithinAvailability = lunchStartsAt < lunchEndsAt && lunchStartsAt >= availableStartsAt && lunchEndsAt <= availableEndsAt;
-    return { startsAt: availableStartsAt, endsAt: availableEndsAt, lunchStartsAt, lunchEndsAt, lunchEnabled: lunchEnabled && lunchIsWithinAvailability, minNoticeHours: Math.max(0, Math.min(720, Number(source.minNoticeHours ?? defaultBookingAvailability.minNoticeHours) || 0)) };
+    const lunchIsWithinAvailability = fullDay || (lunchStartsAt < lunchEndsAt && lunchStartsAt >= availableStartsAt && lunchEndsAt <= availableEndsAt);
+    return { startsAt: availableStartsAt, endsAt: availableEndsAt, fullDay, lunchStartsAt, lunchEndsAt, lunchEnabled: !fullDay && lunchEnabled && lunchIsWithinAvailability, minNoticeHours: Math.max(0, Math.min(720, Number(source.minNoticeHours ?? defaultBookingAvailability.minNoticeHours) || 0)) };
   };
   return { serviceRules: Object.fromEntries(bookingServicesFromContent(content).map(item => [item.id, rule(item)])), blocks: blocks.map((item, index) => ({ id: String(item.id || `block-${index + 1}`), date: String(item.date || ''), startsAt: validTime(item.startsAt), endsAt: validTime(item.endsAt), label: String(item.label || 'Bloqueio').trim().slice(0, 120) })).filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.startsAt && item.endsAt && item.endsAt > item.startsAt) };
 }
@@ -795,7 +798,11 @@ function bookingBlockedByRules(startsAt, endsAt, rules) {
   const date = startsAt.slice(0, 10);
   const startTime = startsAt.slice(11, 16);
   const endTime = endsAt.slice(11, 16);
-  if (endsAt.slice(0, 10) !== date || startTime < rules.startsAt || endTime > rules.endsAt) return 'Esse horário está fora do período disponível para esta sessão.';
+  const nextDate = new Date(`${date}T00:00:00Z`); nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  const midnightNextDay = nextDate.toISOString().slice(0, 10);
+  const endsAtMidnight = rules.fullDay && endsAt.slice(0, 10) === midnightNextDay && endTime === '00:00';
+  if (!rules.fullDay && (endsAt.slice(0, 10) !== date || startTime < rules.startsAt || endTime > rules.endsAt)) return 'Esse horário está fora do período disponível para esta sessão.';
+  if (rules.fullDay && (endsAt.slice(0, 10) !== date && !endsAtMidnight)) return 'Esse horário está fora do período disponível para esta sessão.';
   if (rules.lunchEnabled && startTime < rules.lunchEndsAt && endTime > rules.lunchStartsAt) return 'Esse horário inclui a pausa de almoço.';
   return '';
 }

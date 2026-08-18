@@ -11,19 +11,20 @@
   const esc = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
   const dateKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   const minute = value => { const [hour, minutes] = String(value).split(':').map(Number); return hour * 60 + minutes; };
-  const time = minutes => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+  const time = minutes => { const normalized = ((minutes % 1440) + 1440) % 1440; return `${String(Math.floor(normalized / 60)).padStart(2, '0')}:${String(normalized % 60).padStart(2, '0')}`; };
   const dateTime = (date, value) => new Date(`${dateKey(date)}T${value}:00Z`);
   const service = () => services.find(item => item.id === selectedServiceId) || services[0];
   const duration = () => selectedSlots.length / 2;
   const durationText = () => `${duration().toLocaleString('pt-PT')} ${duration() === 1 ? 'hora' : 'horas'}`;
   const isBookableDay = date => date >= today && date <= latestDate && date.getDay() >= 2 && date.getDay() <= 6;
   const isBusy = (start, end) => busy.some(item => new Date(`${String(item.startsAt).replace(' ', 'T')}Z`) < end && new Date(`${String(item.endsAt).replace(' ', 'T')}Z`) > start);
+  const availabilityEnd = () => rules.fullDay ? 24 * 60 : minute(rules.endsAt);
   const isAvailable = (date, start) => {
-    if (!date || !start || minute(start) < minute(rules.startsAt) || minute(start) + 30 > minute(rules.endsAt)) return false;
+    if (!date || !start || minute(start) < minute(rules.startsAt) || minute(start) + 30 > availabilityEnd()) return false;
     const slotStart = dateTime(date, start), slotEnd = new Date(slotStart.getTime() + 30 * 60000), lunchStart = dateTime(date, rules.lunchStartsAt), lunchEnd = dateTime(date, rules.lunchEndsAt);
     return slotStart.getTime() >= Date.now() + Number(rules.minNoticeHours || 0) * 3600000 && !isBusy(slotStart, slotEnd) && (!rules.lunchEnabled || !(slotStart < lunchEnd && slotEnd > lunchStart));
   };
-  const slots = date => Array.from({ length: (minute(rules.endsAt) - minute(rules.startsAt)) / 30 }, (_, index) => time(minute(rules.startsAt) + index * 30)).filter(value => isAvailable(date, value));
+  const slots = date => Array.from({ length: (availabilityEnd() - minute(rules.startsAt)) / 30 }, (_, index) => time(minute(rules.startsAt) + index * 30)).filter(value => isAvailable(date, value));
   const rangeSlots = (start, end) => { if (!start || !end || minute(end) < minute(start) || minute(end) - minute(start) > 570) return []; const available = new Set(slots(selectedDate)); const values = Array.from({ length: (minute(end) - minute(start)) / 30 + 1 }, (_, index) => time(minute(start) + index * 30)); return values.length >= 4 && values.every(value => available.has(value)) ? values : []; };
   const calculatedEnd = () => rangeEnd ? time(minute(rangeEnd) + 30) : '';
   const hasMinimumSession = date => { const available = new Set(slots(date)); return Array.from(available).some(start => [0, 30, 60, 90].every(offset => available.has(time(minute(start) + offset)))); };
