@@ -230,7 +230,7 @@
       "showLinks": true
     },
     {
-      "name": "Sagi",
+      "name": "Yb Sagi",
       "genre": "",
       "image": "",
       "bio": "",
@@ -301,6 +301,34 @@
     },
     {
       "name": "clxro",
+      "genre": "",
+      "image": "",
+      "bio": "",
+      "instagram": "",
+      "youtube": "",
+      "spotify": "",
+      "appleMusic": "",
+      "spotifyPlaylist": "",
+      "clientId": "",
+      "showBio": true,
+      "showLinks": true
+    },
+    {
+      "name": "Rex",
+      "genre": "",
+      "image": "",
+      "bio": "",
+      "instagram": "",
+      "youtube": "",
+      "spotify": "",
+      "appleMusic": "",
+      "spotifyPlaylist": "",
+      "clientId": "",
+      "showBio": true,
+      "showLinks": true
+    },
+    {
+      "name": "Rudy21",
       "genre": "",
       "image": "",
       "bio": "",
