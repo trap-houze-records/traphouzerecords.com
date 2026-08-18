@@ -363,11 +363,11 @@
       },
       "studio-rental": {
         "startsAt": "00:00",
-        "endsAt": "00:00",
+        "endsAt": "23:00",
         "lunchStartsAt": "13:00",
         "lunchEndsAt": "14:00",
         "lunchEnabled": false,
-        "minNoticeHours": 2
+        "minNoticeHours": 3
       }
     },
     "blocks": []
