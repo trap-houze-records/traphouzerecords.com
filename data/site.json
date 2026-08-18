@@ -145,15 +145,15 @@
     "image": "",
     "stats": [
       {
-        "value": "500+",
+        "value": "150+",
         "label": "Projetos"
       },
       {
-        "value": "200+",
+        "value": "50+",
         "label": "Artistas"
       },
       {
-        "value": "5",
+        "value": "2",
         "label": "Anos"
       },
       {
@@ -342,5 +342,34 @@
       "showLinks": true
     }
   ],
-  "reviews": []
+  "reviews": [],
+  "bookingSchedule": {
+    "serviceRules": {
+      "studio-engineer": {
+        "startsAt": "10:00",
+        "endsAt": "22:00",
+        "lunchStartsAt": "13:00",
+        "lunchEndsAt": "14:00",
+        "lunchEnabled": true,
+        "minNoticeHours": 24
+      },
+      "studio-art-direction": {
+        "startsAt": "10:00",
+        "endsAt": "22:00",
+        "lunchStartsAt": "13:00",
+        "lunchEndsAt": "14:00",
+        "lunchEnabled": true,
+        "minNoticeHours": 24
+      },
+      "studio-rental": {
+        "startsAt": "00:00",
+        "endsAt": "00:00",
+        "lunchStartsAt": "13:00",
+        "lunchEndsAt": "14:00",
+        "lunchEnabled": false,
+        "minNoticeHours": 2
+      }
+    },
+    "blocks": []
+  }
 }
