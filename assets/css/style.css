@@ -347,6 +347,20 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .artist-image-field small { display: block; color: rgba(255,255,255,.55); font-size: .76rem; margin-top: 7px; }
 .artist-image-field img { border: 1px solid rgba(255,255,255,.16); display: block; height: 170px; margin-top: 12px; object-fit: cover; width: min(100%, 250px); }
 .artist-editor .admin-card { max-width: 880px; }
+.artist-order-panel { border: 1px solid rgba(255,255,255,.12); margin-bottom: 18px; max-width: 880px; padding: 18px 20px; }
+.artist-order-heading { align-items: start; display: flex; gap: 20px; justify-content: space-between; margin-bottom: 14px; }
+.artist-order-heading .eyebrow { margin: 0 0 6px; }
+.artist-order-heading h3 { font-size: 1rem; margin: 0; }
+.artist-order-heading small { color: rgba(255,255,255,.5); font-size: .75rem; line-height: 1.45; max-width: 290px; text-align: right; }
+.artist-order-list { border-top: 1px solid rgba(255,255,255,.1); list-style: none; margin: 0; padding: 0; }
+.artist-order-list li { align-items: center; border-bottom: 1px solid rgba(255,255,255,.08); display: grid; gap: 12px; grid-template-columns: 30px minmax(0, 1fr) auto; min-height: 48px; }
+.artist-order-list li:last-child { border-bottom: 0; }
+.artist-order-list li > span { color: #16c7f3; font-size: .7rem; letter-spacing: .1em; }
+.artist-order-list strong { font-size: .9rem; font-weight: 500; }
+.artist-order-list li > div { display: flex; gap: 6px; }
+.artist-order-button { background: transparent; border: 1px solid rgba(255,255,255,.2); color: #16c7f3; cursor: pointer; font-size: 1rem; height: 30px; line-height: 1; width: 32px; }
+.artist-order-button:hover:not(:disabled) { background: #16c7f3; border-color: #16c7f3; color: #061117; }
+.artist-order-button:disabled { color: rgba(255,255,255,.23); cursor: default; }
 .artist-display-options { border-top: 1px solid rgba(255,255,255,.1); border-bottom: 1px solid rgba(255,255,255,.1); display: grid; gap: 10px; margin: 20px 0; padding: 15px 0; }
 .artist-display-options .eyebrow { margin: 0; }
 .artist-display-options small, .artist-editor .admin-field small { color: rgba(255,255,255,.52); font-size: .74rem; line-height: 1.45; }
@@ -1371,6 +1385,9 @@ footer p {
     .artist-links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .artist-links a, .artist-platform-disabled { font-size: .72rem; padding: 9px 10px; }
     .artist-catalog-playlist iframe { height: 400px; }
+    .artist-order-panel { padding: 16px; }
+    .artist-order-heading { display: grid; gap: 8px; }
+    .artist-order-heading small { max-width: none; text-align: left; }
     .client-shell { width: min(100% - 28px, 1180px); padding-top: 18px; }
     .client-header, .client-hero-row { align-items: flex-start; }
     .client-header { gap: 18px; }
