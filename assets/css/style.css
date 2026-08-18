@@ -886,8 +886,8 @@ section {
 .artist-catalog small, .artist-catalog > p { color: rgba(255,255,255,.5); font-size: .74rem; }
 .artist-catalog a { color: #16c7f3; font-size: .74rem; text-decoration: none; }
 .artist-catalog article > span { color: rgba(255,255,255,.46); font-size: .72rem; }
-.artist-catalog .artist-catalog-playlist { align-items: stretch; display: grid; gap: 12px; padding: 18px 0; width: 100%; }
-.artist-catalog-playlist iframe { border: 0; border-radius: 12px; display: block; height: 420px; min-width: 100%; width: 100%; }
+.artist-catalog .artist-catalog-playlist { align-items: stretch; border-bottom: 0; display: grid; gap: 0; grid-template-columns: minmax(0, 1fr); padding: 12px 0 0; width: 100%; }
+.artist-catalog-playlist iframe { border: 0; border-radius: 12px; display: block; height: 420px; justify-self: stretch; max-width: none; min-width: 0; width: 100% !important; }
 
 /* ========== AVALIAÇÕES ========== */
 .reviews {
