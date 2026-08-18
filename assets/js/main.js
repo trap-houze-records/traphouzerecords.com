@@ -46,7 +46,7 @@ function renderAbout() {
 
 function renderArtists() {
   if (!sectionVisible('artists') || !content.artists.length) return '';
-  return `<section id="artists" class="artists"><h2 class="section-title">Artistas</h2><div class="artists-grid">${content.artists.map((artist, index) => `<button type="button" class="artist-item" data-artist="${index}" aria-label="Ver perfil de ${escapeHtml(artist.name)}"><img class="artist-item-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div class="artist-item-name"><h4>${escapeHtml(artist.name)}</h4><p>${escapeHtml(artist.genre)}</p><span>Ver perfil →</span></div></button>`).join('')}</div></section>`;
+  return `<section id="artists" class="artists"><h2 class="section-title">Artistas</h2><div class="artists-grid">${content.artists.map((artist, index) => `<button type="button" class="artist-item" data-artist="${index}" aria-label="Ver perfil de ${escapeHtml(artist.name)}"><img class="artist-item-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div class="artist-item-name"><h4>${escapeHtml(artist.name)}</h4><p>${escapeHtml(String(artist.genre || 'Artista').trim() || 'Artista')}</p><span>Ver perfil →</span></div></button>`).join('')}</div></section>`;
 }
 
 function renderReviews() {
