@@ -886,8 +886,8 @@ section {
 .artist-catalog small, .artist-catalog > p { color: rgba(255,255,255,.5); font-size: .74rem; }
 .artist-catalog a { color: #16c7f3; font-size: .74rem; text-decoration: none; }
 .artist-catalog article > span { color: rgba(255,255,255,.46); font-size: .72rem; }
-.artist-catalog .artist-catalog-playlist { align-items: stretch; display: grid; gap: 12px; padding: 16px 0; }
-.artist-catalog-playlist iframe { border: 0; border-radius: 12px; height: 152px; width: 100%; }
+.artist-catalog .artist-catalog-playlist { align-items: stretch; display: grid; gap: 12px; padding: 20px 0; }
+.artist-catalog-playlist iframe { border: 0; border-radius: 12px; height: 352px; width: 100%; }
 
 /* ========== AVALIAÇÕES ========== */
 .reviews {
