@@ -29,12 +29,12 @@
     {
       "id": "about",
       "label": "Quem somos",
-      "visible": true
+      "visible": false
     },
     {
       "id": "artists",
       "label": "Artistas",
-      "visible": true
+      "visible": false
     },
     {
       "id": "reviews",
