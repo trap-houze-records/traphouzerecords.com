@@ -34,7 +34,7 @@
     {
       "id": "artists",
       "label": "Artistas",
-      "visible": false
+      "visible": true
     },
     {
       "id": "reviews",
@@ -172,7 +172,7 @@
       "spotify": "",
       "appleMusic": "",
       "spotifyPlaylist": "https://open.spotify.com/playlist/7q56qgHskQKwB9L9fW9JHi?si=VJiJnjKlQTm8N61pd8c1dg",
-      "clientId": "",
+      "clientId": "2c9123c5-bd2f-4a6c-a9f3-b8aff546aafe",
       "showBio": true,
       "showLinks": true
     },
