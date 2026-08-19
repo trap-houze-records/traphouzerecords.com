@@ -164,15 +164,16 @@
   },
   "artists": [
     {
-      "name": "J-Dot",
-      "genre": "Artista",
-      "image": "https://www.image2url.com/r2/default/images/1786545581646-3b7cb986-50a1-4f95-8055-c3d62c36344f.jpeg",
+      "name": "Yb Sagi",
+      "genre": "",
+      "image": "",
+      "bio": "",
       "instagram": "",
       "youtube": "",
       "spotify": "",
       "appleMusic": "",
-      "spotifyPlaylist": "https://open.spotify.com/playlist/7q56qgHskQKwB9L9fW9JHi?si=VJiJnjKlQTm8N61pd8c1dg",
-      "clientId": "2c9123c5-bd2f-4a6c-a9f3-b8aff546aafe",
+      "spotifyPlaylist": "",
+      "clientId": "bce2dbc1-7143-4ded-99e7-5c2319809219",
       "showBio": true,
       "showLinks": true
     },
@@ -204,6 +205,19 @@
       "showLinks": true
     },
     {
+      "name": "J-Dot",
+      "genre": "Artista",
+      "image": "https://www.image2url.com/r2/default/images/1786545581646-3b7cb986-50a1-4f95-8055-c3d62c36344f.jpeg",
+      "instagram": "",
+      "youtube": "",
+      "spotify": "",
+      "appleMusic": "",
+      "spotifyPlaylist": "https://open.spotify.com/playlist/7q56qgHskQKwB9L9fW9JHi?si=VJiJnjKlQTm8N61pd8c1dg",
+      "clientId": "2c9123c5-bd2f-4a6c-a9f3-b8aff546aafe",
+      "showBio": true,
+      "showLinks": true
+    },
+    {
       "name": "Gleo",
       "genre": "Artista ",
       "image": "",
@@ -226,20 +240,6 @@
       "appleMusic": "",
       "spotifyPlaylist": "",
       "clientId": "cb132ffb-608f-4b54-bf9f-07723927d768",
-      "showBio": true,
-      "showLinks": true
-    },
-    {
-      "name": "Yb Sagi",
-      "genre": "",
-      "image": "",
-      "bio": "",
-      "instagram": "",
-      "youtube": "",
-      "spotify": "",
-      "appleMusic": "",
-      "spotifyPlaylist": "",
-      "clientId": "bce2dbc1-7143-4ded-99e7-5c2319809219",
       "showBio": true,
       "showLinks": true
     },
