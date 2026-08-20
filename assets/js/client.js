@@ -29,6 +29,9 @@ const paymentFields = item => {
   const paid = item.paidCents === undefined ? (item.paymentStatus === 'paid' || item.paid ? amount : 0) : Number(item.paidCents || 0) / 100;
   return { amount, paid, due: Math.max(0, amount - paid), paymentStatus: paid >= amount ? 'paid' : paid > 0 ? 'partial' : 'pending' };
 };
+const paymentLabel = item => item.amount > 0
+  ? `Pago ${money(item.paid)}${item.due > 0 ? ` · faltam ${money(item.due)}` : ' · confirmado'}`
+  : 'Pagamento a definir';
 function normalisePortal(data) {
   const appointments = (data.appointments || []).map(item => ({ id: item.id, appointmentId: item.id, date: item.startsAt || 'A confirmar', time: item.endsAt ? `${String(item.startsAt || '').slice(11, 16)} — ${String(item.endsAt).slice(11, 16)}` : '', service: item.service, ...paymentFields(item), paymentUrl: item.paymentUrl || '' }));
   const linkedAppointments = new Set((data.bookings || []).map(item => item.appointmentId).filter(Boolean));
@@ -66,7 +69,7 @@ function renderTrack(track) {
       }).join('')}
     </div>
     ${samplyPlayer}
-    <div class="track-payment ${track.paymentStatus}"><span>${track.due === 0 ? 'Pagamento confirmado' : track.paid > 0 ? `Pago ${money(track.paid)} · faltam ${money(track.due)}` : `Pagamento pendente · ${money(track.due)}`}</span>${track.due === 0 ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.due)}</button>`}</div>
+    <div class="track-payment ${track.paymentStatus}"><span>${paymentLabel(track)}</span>${track.due === 0 ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.due)}</button>`}</div>
   </article>`;
 }
 
@@ -80,7 +83,9 @@ function bookingDisplay(booking) {
 function renderBooking(booking) {
   const display = bookingDisplay(booking);
   const hasAmount = Number(booking.amount || 0) > 0;
-  const payment = booking.due === 0 ? '<span>Pago ✓</span>' : hasAmount ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">${booking.paid > 0 ? `Faltam ${money(booking.due)}` : `Pagar ${money(booking.due)}`}</button>` : '<span class="booking-payment-unset">Pagamento a definir</span>';
+  const payment = hasAmount
+    ? `<span>${paymentLabel(booking)}</span>${booking.due > 0 ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">Pagar ${money(booking.due)}</button>` : ''}`
+    : '<span class="booking-payment-unset">Pagamento a definir</span>';
   const reschedule = booking.appointmentId && bookingMoment(booking) >= new Date() ? `<a class="booking-reschedule" href="/booking.html?reschedule=${encodeURIComponent(booking.appointmentId)}">Reagendar →</a>` : '';
   const cancel = booking.appointmentId && bookingMoment(booking) >= new Date() ? `<button type="button" class="booking-cancel" data-cancel-reservation="${escapeHtml(booking.appointmentId)}">Cancelar</button>` : '';
   return `<article class="booking-row"><time>${escapeHtml(display.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(display.time)}</p></div><div class="booking-payment ${booking.paymentStatus}">${payment}${reschedule}${cancel}</div></article>`;
