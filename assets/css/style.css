@@ -232,6 +232,7 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .finance-status { font-size: .7rem; letter-spacing: .04em; text-transform: uppercase; }
 .finance-status.paid { color: #16c7f3; }
 .finance-status.pending { color: #ffd166; }
+.finance-status.partial { color: #9de7f7; }
 
 /* Agenda pública — pré-visualização local */
 .booking-page { min-height: 100vh; background: #090909; color: #fff; }
@@ -1188,6 +1189,7 @@ footer p {
 .track-stage.current { background: #16c7f3; color: #111; }
 .track-payment { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); color: rgba(255,255,255,.7); font-size: .8rem; }
 .track-payment.pending { color: #ffd06a; }
+.track-payment.partial { color: #9de7f7; }
 .track-payment button { border: 1px solid currentColor; background: transparent; color: inherit; padding: 8px 11px; cursor: pointer; font: inherit; font-size: .77rem; }
 .track-samply { border-top: 1px solid rgba(255,255,255,.1); margin-top: 14px; padding-top: 14px; }
 .track-samply .eyebrow { margin-bottom: 9px; }
@@ -1226,6 +1228,8 @@ footer p {
 .booking-row p { margin-top: 5px; color: rgba(255,255,255,.5); font-size: .86rem; }
 .booking-payment span { color: #16c7f3; font-size: .82rem; }
 .booking-payment button { border: 1px solid #ffd06a; background: transparent; color: #ffd06a; padding: 8px 11px; cursor: pointer; font: inherit; font-size: .77rem; }
+.booking-payment .booking-cancel { border-color: rgba(255,255,255,.28); color: rgba(255,255,255,.58); margin-left: 8px; }
+.booking-payment .booking-cancel:hover { border-color: #ff8d9a; color: #ff8d9a; }
 .booking-reschedule { color: #16c7f3; display: inline-block; font-size: .76rem; margin-left: 12px; text-decoration: none; text-underline-offset: 4px; }
 .client-login-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 70% 20%, #222 0, #0a0a0a 42%); }
 .client-login-card { display: grid; gap: 42px; width: min(100%, 480px); border: 1px solid rgba(255,255,255,.15); background: rgba(17,17,17,.94); padding: 38px; }

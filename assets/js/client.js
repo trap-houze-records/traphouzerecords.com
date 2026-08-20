@@ -24,14 +24,19 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ 
 const stages = [['start', 'Iniciar'], ['mix', 'Mix'], ['master', 'Master']];
 const money = value => `${Number(value || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const profileImage = value => /^(?:\/?images\/[-a-zA-Z0-9_./]+|https:\/\/[^\s]+)$/i.test(String(value || '')) ? String(value) : '/images/Logo.png';
+const paymentFields = item => {
+  const amount = item.amountCents === undefined ? Number(item.amount || 0) : Number(item.amountCents || 0) / 100;
+  const paid = item.paidCents === undefined ? (item.paymentStatus === 'paid' || item.paid ? amount : 0) : Number(item.paidCents || 0) / 100;
+  return { amount, paid, due: Math.max(0, amount - paid), paymentStatus: paid >= amount ? 'paid' : paid > 0 ? 'partial' : 'pending' };
+};
 function normalisePortal(data) {
-  const appointments = (data.appointments || []).map(item => ({ id: item.id, appointmentId: item.id, date: item.startsAt || 'A confirmar', time: item.endsAt ? `${String(item.startsAt || '').slice(11, 16)} — ${String(item.endsAt).slice(11, 16)}` : '', service: item.service, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' }));
+  const appointments = (data.appointments || []).map(item => ({ id: item.id, appointmentId: item.id, date: item.startsAt || 'A confirmar', time: item.endsAt ? `${String(item.startsAt || '').slice(11, 16)} — ${String(item.endsAt).slice(11, 16)}` : '', service: item.service, ...paymentFields(item), paymentUrl: item.paymentUrl || '' }));
   const linkedAppointments = new Set((data.bookings || []).map(item => item.appointmentId).filter(Boolean));
   return {
     client: data.client.name,
     artistProfile: data.artistProfile || null,
-    tracks: (data.tracks || []).map(item => ({ title: item.title, stage: item.stage, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '', samplyUrl: item.samplyUrl || '' })),
-    bookings: [...appointments, ...(data.bookings || []).filter(item => !linkedAppointments.has(item.appointmentId)).map(item => ({ id: item.id, date: item.startsAt || 'A confirmar', time: '', service: item.service, paid: item.paymentStatus === 'paid', amount: Number(item.amountCents || 0) / 100, paymentUrl: item.paymentUrl || '' }))]
+    tracks: (data.tracks || []).map(item => ({ title: item.title, stage: item.stage, ...paymentFields(item), paymentUrl: item.paymentUrl || '', samplyUrl: item.samplyUrl || '' })),
+    bookings: [...appointments, ...(data.bookings || []).filter(item => !linkedAppointments.has(item.appointmentId)).map(item => ({ id: item.id, date: item.startsAt || 'A confirmar', time: '', service: item.service, ...paymentFields(item), paymentUrl: item.paymentUrl || '' }))]
   };
 }
 
@@ -61,7 +66,7 @@ function renderTrack(track) {
       }).join('')}
     </div>
     ${samplyPlayer}
-    <div class="track-payment ${track.paid ? 'paid' : 'pending'}"><span>${track.paid ? 'Pagamento confirmado' : `Pagamento pendente · ${money(track.amount)}`}</span>${track.paid ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.amount)}</button>`}</div>
+    <div class="track-payment ${track.paymentStatus}"><span>${track.due === 0 ? 'Pagamento confirmado' : track.paid > 0 ? `Pago ${money(track.paid)} · faltam ${money(track.due)}` : `Pagamento pendente · ${money(track.due)}`}</span>${track.due === 0 ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.due)}</button>`}</div>
   </article>`;
 }
 
@@ -75,9 +80,10 @@ function bookingDisplay(booking) {
 function renderBooking(booking) {
   const display = bookingDisplay(booking);
   const hasAmount = Number(booking.amount || 0) > 0;
-  const payment = booking.paid ? '<span>Pago ✓</span>' : hasAmount ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">Pagar ${money(booking.amount)}</button>` : '<span class="booking-payment-unset">Pagamento a definir</span>';
+  const payment = booking.due === 0 ? '<span>Pago ✓</span>' : hasAmount ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">${booking.paid > 0 ? `Faltam ${money(booking.due)}` : `Pagar ${money(booking.due)}`}</button>` : '<span class="booking-payment-unset">Pagamento a definir</span>';
   const reschedule = booking.appointmentId && bookingMoment(booking) >= new Date() ? `<a class="booking-reschedule" href="/booking.html?reschedule=${encodeURIComponent(booking.appointmentId)}">Reagendar →</a>` : '';
-  return `<article class="booking-row"><time>${escapeHtml(display.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(display.time)}</p></div><div class="booking-payment ${booking.paid ? 'paid' : 'pending'}">${payment}${reschedule}</div></article>`;
+  const cancel = booking.appointmentId && bookingMoment(booking) >= new Date() ? `<button type="button" class="booking-cancel" data-cancel-reservation="${escapeHtml(booking.appointmentId)}">Cancelar</button>` : '';
+  return `<article class="booking-row"><time>${escapeHtml(display.date)}</time><div><strong>${escapeHtml(booking.service)}</strong><p>${escapeHtml(display.time)}</p></div><div class="booking-payment ${booking.paymentStatus}">${payment}${reschedule}${cancel}</div></article>`;
 }
 function bookingMoment(booking) {
   const value = String(booking.date || '').trim().replace(' ', 'T');
@@ -97,7 +103,7 @@ function splitBookings(bookings) {
 const portal = document.getElementById('clientPortal');
 
 function renderPortal() {
-const outstanding = [...clientData.tracks, ...clientData.bookings].filter(item => !item.paid).reduce((total, item) => total + Number(item.amount || 0), 0);
+const outstanding = [...clientData.tracks, ...clientData.bookings].reduce((total, item) => total + Number(item.due || 0), 0);
 const portalNote = apiBase ? 'Área privada · acesso protegido por credenciais.' : 'Protótipo local · o acesso real de cada cliente será ligado numa fase seguinte.';
 const bookings = splitBookings(clientData.bookings);
 portal.innerHTML = `<div class="client-shell client-simple">
@@ -148,6 +154,13 @@ document.addEventListener('click', event => {
     const url = payment.dataset.paymentUrl;
     if (url && /^https:\/\//i.test(url)) window.open(url, '_blank', 'noopener');
     else alert('A Trap Houze ainda não adicionou um link de pagamento para este item.');
+  }
+  const cancel = event.target.closest('[data-cancel-reservation]');
+  if (cancel) {
+    if (!window.confirm('Cancelar esta reserva? O horário volta a ficar disponível.')) return;
+    cancel.disabled = true;
+    apiRequest(`/client/appointments/${encodeURIComponent(cancel.dataset.cancelReservation)}`, { method: 'DELETE' }).then(() => apiRequest('/client/portal')).then(result => { clientData = normalisePortal(result); renderPortal(); }).catch(error => { cancel.disabled = false; alert(error.message); });
+    return;
   }
   if (event.target.closest('.client-signout')) {
     sessionStorage.removeItem('th_client_demo');

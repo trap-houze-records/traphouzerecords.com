@@ -326,9 +326,9 @@ async function portalData(clientId, env) {
   if (!client) return null;
   const artistProfile = await artistProfileForClient(clientId, env);
   const [tracks, bookings, appointments] = await db.batch([
-    db.prepare("SELECT id, title, stage, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl, samply_url AS samplyUrl FROM client_tracks WHERE client_id = ? ORDER BY created_at DESC").bind(clientId),
-    db.prepare("SELECT id, appointment_id AS appointmentId, service, starts_at AS startsAt, payment_status AS paymentStatus, amount_cents AS amountCents, payment_url AS paymentUrl FROM client_bookings WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId),
-    db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, amount_cents AS amountCents, payment_status AS paymentStatus, payment_url AS paymentUrl FROM studio_appointments WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId)
+    db.prepare("SELECT id, title, stage, CASE WHEN paid_cents >= amount_cents THEN 'paid' WHEN paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, amount_cents AS amountCents, paid_cents AS paidCents, payment_url AS paymentUrl, samply_url AS samplyUrl FROM client_tracks WHERE client_id = ? ORDER BY created_at DESC").bind(clientId),
+    db.prepare("SELECT id, appointment_id AS appointmentId, service, starts_at AS startsAt, CASE WHEN paid_cents >= amount_cents THEN 'paid' WHEN paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, amount_cents AS amountCents, paid_cents AS paidCents, payment_url AS paymentUrl FROM client_bookings WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId),
+    db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, CASE WHEN paid_cents >= amount_cents THEN 'paid' WHEN paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, amount_cents AS amountCents, paid_cents AS paidCents, payment_url AS paymentUrl FROM studio_appointments WHERE client_id = ? AND status != 'cancelled' ORDER BY starts_at DESC").bind(clientId)
   ]);
   return { client, tracks: tracks.results, bookings: bookings.results, appointments: appointments.results, artistProfile };
 }
@@ -362,9 +362,19 @@ async function clientAppointment(request, env, appointmentId) {
   const session = await clientSession(request, env);
   if (!session) return error('Inicie sessão para gerir a marcação.', 401);
   const db = clientDb(env);
-  const current = await db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, amount_cents AS amountCents, payment_status AS paymentStatus, payment_url AS paymentUrl, google_event_id AS googleEventId FROM studio_appointments WHERE id = ? AND client_id = ? AND status != 'cancelled'").bind(appointmentId, session.clientId).first();
+  const current = await db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, amount_cents AS amountCents, paid_cents AS paidCents, payment_status AS paymentStatus, payment_url AS paymentUrl, google_event_id AS googleEventId FROM studio_appointments WHERE id = ? AND client_id = ? AND status != 'cancelled'").bind(appointmentId, session.clientId).first();
   if (!current) return error('Marcação não encontrada.', 404);
   if (request.method === 'GET') return jsonResponse(current);
+  if (request.method === 'DELETE') {
+    const cancelled = { ...current, status: 'cancelled', amountCents: 0, paidCents: 0, paymentStatus: 'paid' };
+    await db.batch([
+      db.prepare("UPDATE studio_appointments SET status = 'cancelled', amount_cents = 0, paid_cents = 0, payment_status = 'paid', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(appointmentId),
+      db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'booking.cancelled', JSON.stringify({ appointmentId }))
+    ]);
+    await syncAppointmentBooking(db, appointmentId, cancelled);
+    try { await googleDeleteAppointment(env, cancelled); } catch (caught) { console.warn('Google Calendar: cancelamento guardado sem remover espelho', caught); }
+    return jsonResponse({ id: appointmentId, status: 'cancelled', amountCents: 0, paidCents: 0 });
+  }
   let body;
   try { body = await request.json(); } catch { return error('Pedido inválido.'); }
   const date = bookingDate(body.date);
@@ -443,6 +453,13 @@ function paymentStatus(value) {
   if (!['pending', 'paid'].includes(value)) throw inputError('Estado de pagamento inválido.');
   return value;
 }
+function paymentDetails(amount, paidAmount, legacyStatus = 'pending') {
+  const amountCents = cents(amount || 0);
+  const hasPaidAmount = paidAmount !== undefined && paidAmount !== null && String(paidAmount).trim() !== '';
+  const paidCents = hasPaidAmount ? cents(paidAmount) : legacyStatus === 'paid' ? amountCents : 0;
+  if (paidCents > amountCents) throw inputError('O montante recebido não pode ser superior ao valor total.');
+  return { amountCents, paidCents, paymentStatus: paidCents >= amountCents ? 'paid' : 'pending' };
+}
 function paymentUrl(value) {
   if (!value) return null;
   try { const url = new URL(value); if (url.protocol !== 'https:') throw new Error(); return url.toString(); } catch { throw inputError('O link de pagamento deve usar HTTPS.'); }
@@ -492,7 +509,8 @@ async function appointmentPayload(body, db) {
     if (existing) clientId = existing.id;
     else newClient = { name: guestName, email: guestEmail };
   }
-  return { clientId, guestName: clientId ? null : guestName, guestPhone: null, guestEmail: clientId ? null : guestEmail, newClient, service, startsAt, endsAt, status, notes, amountCents: cents(body.amount || 0), paymentStatus: paymentStatus(body.paymentStatus || 'pending'), paymentUrl: paymentUrl(body.paymentUrl) };
+  const payment = status === 'cancelled' ? { amountCents: 0, paidCents: 0, paymentStatus: 'paid' } : paymentDetails(body.amount, body.paidAmount, paymentStatus(body.paymentStatus || 'pending'));
+  return { clientId, guestName: clientId ? null : guestName, guestPhone: null, guestEmail: clientId ? null : guestEmail, newClient, service, startsAt, endsAt, status, notes, ...payment, paymentUrl: paymentUrl(body.paymentUrl) };
 }
 async function appointmentClient(db, appointment) {
   if (!appointment.newClient) return appointment;
@@ -512,17 +530,17 @@ async function syncAppointmentBooking(db, appointmentId, appointment) {
     if (linked) await db.prepare('DELETE FROM client_bookings WHERE id = ?').bind(linked.id).run();
     return;
   }
-  const values = [appointment.clientId, appointment.service, appointment.startsAt, appointment.paymentStatus, appointment.amountCents, appointment.paymentUrl];
+  const values = [appointment.clientId, appointment.service, appointment.startsAt, appointment.paymentStatus, appointment.amountCents, Number(appointment.paidCents || 0), appointment.paymentUrl];
   if (linked) {
-    await db.prepare('UPDATE client_bookings SET client_id = ?, service = ?, starts_at = ?, payment_status = ?, amount_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE appointment_id = ?').bind(...values, appointmentId).run();
+    await db.prepare('UPDATE client_bookings SET client_id = ?, service = ?, starts_at = ?, payment_status = ?, amount_cents = ?, paid_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE appointment_id = ?').bind(...values, appointmentId).run();
     return;
   }
   const legacy = await db.prepare('SELECT id FROM client_bookings WHERE appointment_id IS NULL AND client_id = ? AND service = ? AND starts_at = ? LIMIT 1').bind(appointment.clientId, appointment.service, appointment.startsAt).first();
   if (legacy) {
-    await db.prepare('UPDATE client_bookings SET appointment_id = ?, payment_status = ?, amount_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(appointmentId, appointment.paymentStatus, appointment.amountCents, appointment.paymentUrl, legacy.id).run();
+    await db.prepare('UPDATE client_bookings SET appointment_id = ?, payment_status = ?, amount_cents = ?, paid_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(appointmentId, appointment.paymentStatus, appointment.amountCents, Number(appointment.paidCents || 0), appointment.paymentUrl, legacy.id).run();
     return;
   }
-  await db.prepare('INSERT INTO client_bookings (id, client_id, appointment_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(randomId(), appointment.clientId, appointmentId, appointment.service, appointment.startsAt, appointment.paymentStatus, appointment.amountCents, appointment.paymentUrl).run();
+  await db.prepare('INSERT INTO client_bookings (id, client_id, appointment_id, service, starts_at, payment_status, amount_cents, paid_cents, payment_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(randomId(), appointment.clientId, appointmentId, appointment.service, appointment.startsAt, appointment.paymentStatus, appointment.amountCents, Number(appointment.paidCents || 0), appointment.paymentUrl).run();
 }
 async function hasAppointmentConflict(db, appointment, excludeId = '') {
   if (appointment.status === 'cancelled') return false;
@@ -571,31 +589,33 @@ async function financeSummary(request, env) {
   if (!admin) return error('Pedido de administração não autorizado.', 403);
   const db = clientDb(env);
   const records = await db.prepare(`
-    SELECT t.id, t.client_id AS clientId, c.display_name AS clientName, 'track' AS type, t.title AS description, t.stage, t.payment_status AS paymentStatus, t.amount_cents AS amountCents, t.payment_url AS paymentUrl, t.created_at AS createdAt
+    SELECT t.id, t.client_id AS clientId, c.display_name AS clientName, 'track' AS type, t.title AS description, t.stage, CASE WHEN t.paid_cents >= t.amount_cents THEN 'paid' WHEN t.paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, t.amount_cents AS amountCents, t.paid_cents AS paidCents, t.payment_url AS paymentUrl, t.created_at AS createdAt
     FROM client_tracks t JOIN clients c ON c.id = t.client_id
     UNION ALL
-    SELECT a.id, COALESCE(a.client_id, 'guest:' || a.id) AS clientId, COALESCE(c.display_name, a.guest_name, 'Cliente') AS clientName, 'appointment' AS type, a.service AS description, NULL AS stage, a.payment_status AS paymentStatus, a.amount_cents AS amountCents, a.payment_url AS paymentUrl, a.starts_at AS createdAt
+    SELECT a.id, COALESCE(a.client_id, 'guest:' || a.id) AS clientId, COALESCE(c.display_name, a.guest_name, 'Cliente') AS clientName, 'appointment' AS type, a.service AS description, NULL AS stage, CASE WHEN a.paid_cents >= a.amount_cents THEN 'paid' WHEN a.paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, a.amount_cents AS amountCents, a.paid_cents AS paidCents, a.payment_url AS paymentUrl, a.starts_at AS createdAt
     FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id
     WHERE a.status != 'cancelled'
     UNION ALL
-    SELECT b.id, b.client_id AS clientId, c.display_name AS clientName, 'booking' AS type, b.service AS description, NULL AS stage, b.payment_status AS paymentStatus, b.amount_cents AS amountCents, b.payment_url AS paymentUrl, COALESCE(b.starts_at, b.created_at) AS createdAt
+    SELECT b.id, b.client_id AS clientId, c.display_name AS clientName, 'booking' AS type, b.service AS description, NULL AS stage, CASE WHEN b.paid_cents >= b.amount_cents THEN 'paid' WHEN b.paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, b.amount_cents AS amountCents, b.paid_cents AS paidCents, b.payment_url AS paymentUrl, COALESCE(b.starts_at, b.created_at) AS createdAt
     FROM client_bookings b JOIN clients c ON c.id = b.client_id
     WHERE b.appointment_id IS NULL
     ORDER BY createdAt DESC
   `).all();
-  const items = records.results || [];
+  const items = (records.results || []).map(item => ({ ...item, paidCents: Math.min(Number(item.amountCents || 0), Number(item.paidCents || 0)), outstandingCents: Math.max(0, Number(item.amountCents || 0) - Number(item.paidCents || 0)) }));
   const totals = items.reduce((summary, item) => {
     const amount = Number(item.amountCents || 0);
     summary.total += amount;
-    if (item.paymentStatus === 'paid') summary.paid += amount;
-    else { summary.pending += amount; summary.pendingCount += 1; }
+    summary.paid += item.paidCents;
+    summary.pending += item.outstandingCents;
+    if (item.outstandingCents > 0) summary.pendingCount += 1;
     return summary;
   }, { total: 0, paid: 0, pending: 0, pendingCount: 0 });
   const byClient = new Map();
   items.forEach(item => {
     const entry = byClient.get(item.clientId) || { clientId: item.clientId, clientName: item.clientName, paid: 0, pending: 0, items: 0 };
     entry.items += 1;
-    entry[item.paymentStatus === 'paid' ? 'paid' : 'pending'] += Number(item.amountCents || 0);
+    entry.paid += item.paidCents;
+    entry.pending += item.outstandingCents;
     byClient.set(item.clientId, entry);
   });
   return jsonResponse({ totals, items, clients: [...byClient.values()].sort((a, b) => b.pending - a.pending || b.paid - a.paid) });
@@ -609,7 +629,7 @@ async function dashboardSummary(request, env) {
   const today = now.toISOString().slice(0, 10);
   const [clients, finance, appointments, upcoming, activity] = await db.batch([
     db.prepare('SELECT COUNT(*) AS count FROM clients WHERE active = 1'),
-    db.prepare(`SELECT COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount_cents ELSE 0 END), 0) AS paid, COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN amount_cents ELSE 0 END), 0) AS pending FROM (SELECT payment_status, amount_cents FROM client_tracks WHERE substr(created_at, 1, 7) = ? UNION ALL SELECT payment_status, amount_cents FROM studio_appointments WHERE status != 'cancelled' AND substr(starts_at, 1, 7) = ? UNION ALL SELECT payment_status, amount_cents FROM client_bookings WHERE appointment_id IS NULL AND substr(COALESCE(starts_at, created_at), 1, 7) = ?)` ).bind(month, month, month),
+    db.prepare(`SELECT COALESCE(SUM(paid_cents), 0) AS paid, COALESCE(SUM(amount_cents - paid_cents), 0) AS pending FROM (SELECT amount_cents, paid_cents FROM client_tracks WHERE substr(created_at, 1, 7) = ? UNION ALL SELECT amount_cents, paid_cents FROM studio_appointments WHERE status != 'cancelled' AND substr(starts_at, 1, 7) = ? UNION ALL SELECT amount_cents, paid_cents FROM client_bookings WHERE appointment_id IS NULL AND substr(COALESCE(starts_at, created_at), 1, 7) = ?)` ).bind(month, month, month),
     db.prepare("SELECT COUNT(*) AS count, COALESCE(SUM((julianday(ends_at) - julianday(starts_at)) * 24), 0) AS hours FROM studio_appointments WHERE status != 'cancelled' AND substr(starts_at, 1, 7) = ?").bind(month),
     db.prepare("SELECT a.id, COALESCE(c.display_name, a.guest_name, 'Cliente') AS clientName, a.service, a.starts_at AS startsAt, a.ends_at AS endsAt, a.status FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id WHERE a.status != 'cancelled' AND a.starts_at >= ? ORDER BY a.starts_at ASC LIMIT 5").bind(`${today} 00:00`),
     db.prepare("SELECT l.action, l.created_at AS createdAt, COALESCE(c.display_name, 'Cliente removido') AS clientName FROM client_audit_log l LEFT JOIN clients c ON c.id = l.client_id ORDER BY l.created_at DESC LIMIT 6")
@@ -850,7 +870,7 @@ async function publicBooking(request, env) {
   if (overlapsBlock) return error('Este período está bloqueado pelo estúdio.', 409);
   if (!sessionClient && (!guestName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail))) return error('Indique o nome e um e-mail válido.');
   const amountCents = Math.round(bookingService.pricePerHour * duration * 100);
-  const appointment = { clientId: sessionClient?.id || null, guestName: sessionClient ? null : guestName, guestPhone: null, guestEmail: sessionClient ? null : guestEmail, service, startsAt, endsAt, status: 'pending', amountCents, paymentStatus: 'pending', paymentUrl: null, notes };
+  const appointment = { clientId: sessionClient?.id || null, guestName: sessionClient ? null : guestName, guestPhone: null, guestEmail: sessionClient ? null : guestEmail, service, startsAt, endsAt, status: 'pending', amountCents, paidCents: 0, paymentStatus: 'pending', paymentUrl: null, notes };
   if (await hasAppointmentConflict(db, appointment)) return error('Este horário já não está disponível. Escolha outro, por favor.', 409);
   const id = randomId();
   const statements = [db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, guest_email, service, starts_at, ends_at, status, amount_cents, payment_status, payment_url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.amountCents, appointment.paymentStatus, appointment.paymentUrl, appointment.notes)];
@@ -873,7 +893,7 @@ async function studioSchedule(request, env, appointmentId = '') {
     const url = new URL(request.url);
     const from = appointmentDate(url.searchParams.get('from') || new Date().toISOString(), 'Data inicial');
     const until = appointmentDate(url.searchParams.get('until') || new Date(Date.now() + 1000 * 60 * 60 * 24 * 31).toISOString(), 'Data final');
-    const appointments = await db.prepare("SELECT a.id, a.client_id AS clientId, COALESCE(c.display_name, a.guest_name) AS clientName, COALESCE(c.email, a.guest_email) AS clientEmail, a.service, a.starts_at AS startsAt, a.ends_at AS endsAt, a.status, a.notes, a.amount_cents AS amountCents, a.payment_status AS paymentStatus, a.payment_url AS paymentUrl, a.google_event_id AS googleEventId, 'studio' AS source FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id WHERE a.starts_at < ? AND a.ends_at > ? ORDER BY a.starts_at ASC").bind(until, from).all();
+    const appointments = await db.prepare("SELECT a.id, a.client_id AS clientId, COALESCE(c.display_name, a.guest_name) AS clientName, COALESCE(c.email, a.guest_email) AS clientEmail, a.service, a.starts_at AS startsAt, a.ends_at AS endsAt, a.status, a.notes, a.amount_cents AS amountCents, a.paid_cents AS paidCents, CASE WHEN a.paid_cents >= a.amount_cents THEN 'paid' WHEN a.paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, a.payment_url AS paymentUrl, a.google_event_id AS googleEventId, 'studio' AS source FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id WHERE a.starts_at < ? AND a.ends_at > ? ORDER BY a.starts_at ASC").bind(until, from).all();
     for (const appointment of appointments.results) {
       if (!appointment.googleEventId && appointment.status !== 'cancelled') {
         try { appointment.googleEventId = await googleSyncAppointment(env, db, appointment); } catch (caught) { console.warn('Google Calendar: não foi possível sincronizar marcação existente', caught); }
@@ -899,9 +919,9 @@ async function studioSchedule(request, env, appointmentId = '') {
   if (appointmentId) {
     const current = await db.prepare('SELECT id FROM studio_appointments WHERE id = ?').bind(id).first();
     if (!current) return error('Marcação não encontrada.', 404);
-    await db.prepare('UPDATE studio_appointments SET client_id = ?, guest_name = ?, guest_phone = ?, guest_email = ?, service = ?, starts_at = ?, ends_at = ?, status = ?, amount_cents = ?, payment_status = ?, payment_url = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.amountCents, appointment.paymentStatus, appointment.paymentUrl, appointment.notes, id).run();
+    await db.prepare('UPDATE studio_appointments SET client_id = ?, guest_name = ?, guest_phone = ?, guest_email = ?, service = ?, starts_at = ?, ends_at = ?, status = ?, amount_cents = ?, paid_cents = ?, payment_status = ?, payment_url = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.amountCents, appointment.paidCents, appointment.paymentStatus, appointment.paymentUrl, appointment.notes, id).run();
   } else {
-    await db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, guest_email, service, starts_at, ends_at, status, amount_cents, payment_status, payment_url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.amountCents, appointment.paymentStatus, appointment.paymentUrl, appointment.notes).run();
+    await db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, guest_email, service, starts_at, ends_at, status, amount_cents, paid_cents, payment_status, payment_url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.amountCents, appointment.paidCents, appointment.paymentStatus, appointment.paymentUrl, appointment.notes).run();
   }
   await syncAppointmentBooking(db, id, appointment);
   const currentGoogle = appointmentId ? await db.prepare('SELECT google_event_id AS googleEventId FROM studio_appointments WHERE id = ?').bind(id).first() : null;
@@ -960,8 +980,9 @@ async function portalAdminMutation(request, env, resource, id) {
     const title = String((isTrack ? body.title : body.service) || '').trim();
     if (!clientId || !title) return error('Dados incompletos.');
     const itemId = randomId();
-    if (isTrack) await db.prepare('INSERT INTO client_tracks (id, client_id, title, stage, payment_status, amount_cents, payment_url, samply_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(itemId, clientId, title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', paymentStatus(body.paymentStatus || 'pending'), cents(body.amount || 0), paymentUrl(body.paymentUrl), samplyPlayerUrl(body.samplyUrl)).run();
-    else await db.prepare('INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, payment_url) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(itemId, clientId, title, body.startsAt || null, paymentStatus(body.paymentStatus || 'pending'), cents(body.amount || 0), paymentUrl(body.paymentUrl)).run();
+    const payment = paymentDetails(body.amount, body.paidAmount, paymentStatus(body.paymentStatus || 'pending'));
+    if (isTrack) await db.prepare('INSERT INTO client_tracks (id, client_id, title, stage, payment_status, amount_cents, paid_cents, payment_url, samply_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(itemId, clientId, title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', payment.paymentStatus, payment.amountCents, payment.paidCents, paymentUrl(body.paymentUrl), samplyPlayerUrl(body.samplyUrl)).run();
+    else await db.prepare('INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, paid_cents, payment_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(itemId, clientId, title, body.startsAt || null, payment.paymentStatus, payment.amountCents, payment.paidCents, paymentUrl(body.paymentUrl)).run();
     await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), clientId, admin.login, `${resource}.created`).run();
     return jsonResponse({ id: itemId }, 201);
   }
@@ -974,8 +995,9 @@ async function portalAdminMutation(request, env, resource, id) {
   }
   const title = String((isTrack ? body.title : body.service) || '').trim();
   if (!title) return error('Título inválido.');
-  if (isTrack) await db.prepare('UPDATE client_tracks SET title = ?, stage = ?, payment_status = ?, amount_cents = ?, payment_url = ?, samply_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', paymentStatus(body.paymentStatus), cents(body.amount), paymentUrl(body.paymentUrl), samplyPlayerUrl(body.samplyUrl), id).run();
-  else await db.prepare('UPDATE client_bookings SET service = ?, starts_at = ?, payment_status = ?, amount_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(title, body.startsAt || null, paymentStatus(body.paymentStatus), cents(body.amount), paymentUrl(body.paymentUrl), id).run();
+  const payment = paymentDetails(body.amount, body.paidAmount, paymentStatus(body.paymentStatus || 'pending'));
+  if (isTrack) await db.prepare('UPDATE client_tracks SET title = ?, stage = ?, payment_status = ?, amount_cents = ?, paid_cents = ?, payment_url = ?, samply_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', payment.paymentStatus, payment.amountCents, payment.paidCents, paymentUrl(body.paymentUrl), samplyPlayerUrl(body.samplyUrl), id).run();
+  else await db.prepare('UPDATE client_bookings SET service = ?, starts_at = ?, payment_status = ?, amount_cents = ?, paid_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(title, body.startsAt || null, payment.paymentStatus, payment.amountCents, payment.paidCents, paymentUrl(body.paymentUrl), id).run();
   await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), item.client_id, admin.login, `${resource}.updated`).run();
   return jsonResponse({ ok: true });
 }
@@ -1031,7 +1053,7 @@ export default {
       else if (url.pathname === '/client/artist-profile' && ['GET', 'PATCH'].includes(request.method)) response = await clientArtistProfile(request, env);
       else if (url.pathname === '/client/artist-image' && request.method === 'POST') response = await clientArtistImage(request, env);
       else if (url.pathname === '/artists/profiles' && request.method === 'GET') response = await publicArtistProfiles(env);
-      else if (/^\/client\/appointments\/[0-9a-f-]{36}$/i.test(url.pathname) && ['GET', 'PATCH'].includes(request.method)) response = await clientAppointment(request, env, url.pathname.split('/').pop());
+      else if (/^\/client\/appointments\/[0-9a-f-]{36}$/i.test(url.pathname) && ['GET', 'PATCH', 'DELETE'].includes(request.method)) response = await clientAppointment(request, env, url.pathname.split('/').pop());
       else if (url.pathname === '/google-calendar/status' && request.method === 'GET') response = await googleCalendarStatus(request, env);
       else if (url.pathname === '/google-calendar/connect' && request.method === 'POST') response = await googleCalendarConnect(request, env);
       else if (url.pathname === '/google-calendar/callback' && request.method === 'GET') response = await googleCalendarCallback(request, env);
