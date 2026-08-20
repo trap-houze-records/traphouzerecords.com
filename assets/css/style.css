@@ -292,6 +292,8 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .booking-half-hour-slots button.range-start { background: #052a36; border-color: #16c7f3; box-shadow: inset 0 0 0 1px rgba(255,255,255,.72); color: #dffbff; }
 .booking-half-hour-slots button.range-end-unavailable { border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.07); color: rgba(255,255,255,.38); }
 .booking-half-hour-slots button.range-end-unavailable:hover { background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.28); color: rgba(255,255,255,.72); }
+.booking-half-hour-slots .booking-range-end { align-items: center; background: #16c7f3; border: 1px solid #16c7f3; color: #071217; display: flex; flex-direction: column; font-size: .82rem; font-weight: 800; justify-content: center; line-height: 1.05; min-height: 42px; padding: 5px 6px; }
+.booking-half-hour-slots .booking-range-end small { font-size: .62rem; font-weight: 700; letter-spacing: .08em; opacity: .72; text-transform: uppercase; }
 .booking-continue { width: 100%; border: 0; background: #16c7f3; color: #101010; cursor: pointer; font: inherit; font-size: .82rem; margin-top: 18px; padding: 13px; }
 .booking-alert { color: #ffae9d !important; line-height: 1.5; }
 .booking-client-note { color: rgba(255,255,255,.68); font-size: .82rem; line-height: 1.5; margin: 22px 0 -8px; }
