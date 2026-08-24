@@ -415,6 +415,31 @@ async function clientTrackComment(request, env, trackId) {
   await db.prepare('INSERT INTO client_track_comments (id, track_id, version_id, author_type, body, position_seconds) VALUES (?, ?, ?, ?, ?, ?)').bind(id, track.id, versionId, 'client', text, positionSeconds).run();
   return jsonResponse({ id, trackId: track.id, versionId, authorType: 'client', body: text, positionSeconds }, 201);
 }
+async function clientTrackCommentManage(request, env, trackId, commentId) {
+  const session = await clientSession(request, env);
+  if (!session) return error('Inicie sessão para gerir comentários.', 401);
+  const db = clientDb(env);
+  const track = await clientOwnedTrack(db, session.clientId, trackId);
+  const comment = await db.prepare('SELECT id, author_type AS authorType FROM client_track_comments WHERE id = ? AND track_id = ?').bind(commentId, track.id).first();
+  if (!comment) return error('Comentário não encontrado.', 404);
+  if (comment.authorType !== 'client') return error('Só pode alterar os seus próprios comentários.', 403);
+  if (request.method === 'DELETE') {
+    await db.batch([
+      db.prepare('DELETE FROM client_track_comments WHERE id = ? AND track_id = ?').bind(commentId, track.id),
+      db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'track_comment.deleted', JSON.stringify({ trackId, commentId }))
+    ]);
+    return jsonResponse({ id: commentId, deleted: true });
+  }
+  let body;
+  try { body = await request.json(); } catch { return error('Pedido inválido.'); }
+  const text = String(body.body || '').trim().slice(0, 2000);
+  if (!text) return error('Escreva um comentário.');
+  await db.batch([
+    db.prepare('UPDATE client_track_comments SET body = ? WHERE id = ? AND track_id = ?').bind(text, commentId, track.id),
+    db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'track_comment.updated', JSON.stringify({ trackId, commentId }))
+  ]);
+  return jsonResponse({ id: commentId, body: text });
+}
 async function clientTrackFile(request, env, trackId, versionId) {
   const session = await clientSession(request, env);
   if (!session) return error('Inicie sessão para descarregar ficheiros.', 401);
@@ -463,6 +488,31 @@ async function adminTrackComment(request, env, trackId) {
   const id = randomId();
   await db.prepare('INSERT INTO client_track_comments (id, track_id, version_id, author_type, body, position_seconds) VALUES (?, ?, ?, ?, ?, ?)').bind(id, track.id, versionId, 'admin', text, positionSeconds).run();
   return jsonResponse({ id, trackId: track.id, versionId, authorType: 'admin', body: text, positionSeconds }, 201);
+}
+async function adminTrackCommentManage(request, env, trackId, commentId) {
+  const admin = await requirePortalAdmin(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  const db = clientDb(env);
+  const track = await db.prepare('SELECT id, client_id AS clientId FROM client_tracks WHERE id = ?').bind(trackId).first();
+  if (!track) return error('Música não encontrada.', 404);
+  const comment = await db.prepare('SELECT id FROM client_track_comments WHERE id = ? AND track_id = ?').bind(commentId, track.id).first();
+  if (!comment) return error('Comentário não encontrado.', 404);
+  if (request.method === 'DELETE') {
+    await db.batch([
+      db.prepare('DELETE FROM client_track_comments WHERE id = ? AND track_id = ?').bind(commentId, track.id),
+      db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), track.clientId, admin.login, 'track_comment.deleted', JSON.stringify({ trackId, commentId }))
+    ]);
+    return jsonResponse({ id: commentId, deleted: true });
+  }
+  let body;
+  try { body = await request.json(); } catch { return error('Pedido inválido.'); }
+  const text = String(body.body || '').trim().slice(0, 2000);
+  if (!text) return error('Escreva um comentário.');
+  await db.batch([
+    db.prepare('UPDATE client_track_comments SET body = ? WHERE id = ? AND track_id = ?').bind(text, commentId, track.id),
+    db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), track.clientId, admin.login, 'track_comment.updated', JSON.stringify({ trackId, commentId }))
+  ]);
+  return jsonResponse({ id: commentId, body: text });
 }
 async function adminTrackFile(request, env, trackId, versionId) {
   const admin = await adminSession(request, env);
@@ -1239,6 +1289,7 @@ export default {
       else if (url.pathname === '/artists/profiles' && request.method === 'GET') response = await publicArtistProfiles(env);
       else if (/^\/client\/tracks\/[0-9a-f-]{36}\/versions$/i.test(url.pathname) && request.method === 'POST') response = await clientTrackVersion(request, env, url.pathname.split('/')[3]);
       else if (/^\/client\/tracks\/[0-9a-f-]{36}\/comments$/i.test(url.pathname) && request.method === 'POST') response = await clientTrackComment(request, env, url.pathname.split('/')[3]);
+      else if (/^\/client\/tracks\/[0-9a-f-]{36}\/comments\/[0-9a-f-]{36}$/i.test(url.pathname) && ['PATCH', 'DELETE'].includes(request.method)) response = await clientTrackCommentManage(request, env, url.pathname.split('/')[3], url.pathname.split('/')[5]);
       else if (/^\/client\/tracks\/[0-9a-f-]{36}\/versions\/[0-9a-f-]{36}\/file$/i.test(url.pathname) && request.method === 'GET') response = await clientTrackFile(request, env, url.pathname.split('/')[3], url.pathname.split('/')[5]);
       else if (/^\/client\/appointments\/[0-9a-f-]{36}$/i.test(url.pathname) && ['GET', 'PATCH', 'DELETE'].includes(request.method)) response = await clientAppointment(request, env, url.pathname.split('/').pop());
       else if (url.pathname === '/google-calendar/status' && request.method === 'GET') response = await googleCalendarStatus(request, env);
@@ -1255,6 +1306,7 @@ export default {
       else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/versions$/i.test(url.pathname) && request.method === 'POST') response = await adminTrackVersion(request, env, url.pathname.split('/')[4]);
       else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/versions\/[0-9a-f-]{36}$/i.test(url.pathname) && request.method === 'DELETE') response = await adminTrackVersionDelete(request, env, url.pathname.split('/')[4], url.pathname.split('/')[6]);
       else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/comments$/i.test(url.pathname) && request.method === 'POST') response = await adminTrackComment(request, env, url.pathname.split('/')[4]);
+      else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/comments\/[0-9a-f-]{36}$/i.test(url.pathname) && ['PATCH', 'DELETE'].includes(request.method)) response = await adminTrackCommentManage(request, env, url.pathname.split('/')[4], url.pathname.split('/')[6]);
       else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/versions\/[0-9a-f-]{36}\/file$/i.test(url.pathname) && request.method === 'GET') response = await adminTrackFile(request, env, url.pathname.split('/')[4], url.pathname.split('/')[6]);
       else if (/^\/client\/admin\/clients\/[0-9a-f-]{36}$/i.test(url.pathname) && request.method === 'GET') response = await portalAdminClient(request, env, url.pathname.split('/').pop());
       else if (url.pathname === '/studio/appointments' && request.method === 'GET') response = await studioSchedule(request, env);

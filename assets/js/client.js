@@ -14,6 +14,7 @@ let clientData = defaultClientData;
 let musicTab = 'mix-master';
 let submittingTrack = false;
 const trackAudioUrls = new Map();
+const openTrackComments = new Set();
 const apiBase = (window.CLIENT_PORTAL_API_URL || window.CMS_API_URL || '').replace(/\/$/, '');
 const usesLocalPortalApi = /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(apiBase);
 const clientTokenKey = 'th_client_portal_token';
@@ -32,9 +33,11 @@ const paymentFields = item => {
   const paid = item.paidCents === undefined ? (item.paymentStatus === 'paid' || item.paid ? amount : 0) : Number(item.paidCents || 0) / 100;
   return { amount, paid, due: Math.max(0, amount - paid), paymentStatus: paid >= amount ? 'paid' : paid > 0 ? 'partial' : 'pending' };
 };
-const paymentLabel = item => item.amount > 0
-  ? `Pago ${money(item.paid)}${item.due > 0 ? ` · faltam ${money(item.due)}` : ' · confirmado'}`
-  : 'Pagamento a definir';
+const paymentLabel = item => {
+  if (item.amount <= 0) return 'Pagamento a definir';
+  if (item.due <= 0) return `Pago ${money(item.paid)} · confirmado`;
+  return item.paid > 0 ? `Pago ${money(item.paid)} · faltam ${money(item.due)}` : '';
+};
 function normalisePortal(data) {
   const appointments = (data.appointments || []).map(item => ({ id: item.id, appointmentId: item.id, date: item.startsAt || 'A confirmar', time: item.endsAt ? `${String(item.startsAt || '').slice(11, 16)} — ${String(item.endsAt).slice(11, 16)}` : '', service: item.service, ...paymentFields(item), paymentUrl: item.paymentUrl || '' }));
   const linkedAppointments = new Set((data.bookings || []).map(item => item.appointmentId).filter(Boolean));
@@ -95,17 +98,19 @@ function renderTrack(track) {
   const initialVersionId = latest?.id || '';
   const initialComments = comments.filter(comment => (comment.versionId || initialVersionId) === initialVersionId);
   const versionLabels = new Map(versions.map(version => [version.id, version.label]));
-  const commentsPanel = `<div class="track-workspace track-comments" data-track-comments><div class="track-workspace-heading"><strong>Comentários da versão</strong><span data-comment-count>${initialComments.length}</span></div><div data-track-comment-list>${comments.map(comment => {
+  const commentsOpen = openTrackComments.has(track.id);
+  const commentsPanel = `<div class="track-workspace track-comments" data-track-comments ${commentsOpen ? '' : 'hidden'}><div class="track-workspace-heading"><strong>Comentários da versão</strong><span data-comment-count>${initialComments.length}</span></div><div data-track-comment-list>${comments.map(comment => {
     const versionId = comment.versionId || initialVersionId;
     const visible = versionId === initialVersionId;
-    return `<article data-comment-version="${escapeHtml(versionId)}" ${visible ? '' : 'hidden'}><div class="track-comment-meta"><b>${comment.authorType === 'admin' ? 'Trap Houze' : 'Tu'}</b><button type="button" data-comment-seek="${Number(comment.positionSeconds || 0)}" data-comment-version="${escapeHtml(versionId)}" data-track-id="${escapeHtml(track.id)}">${escapeHtml(versionLabels.get(versionId) || 'Versão')} · ${formatAudioTime(comment.positionSeconds)}</button></div><p>${escapeHtml(comment.body)}</p></article>`;
+    const ownActions = comment.authorType === 'client' && comment.id ? `<div class="track-comment-actions" data-comment-actions><button type="button" data-edit-comment="${escapeHtml(comment.id)}">Editar</button><button type="button" class="danger" data-delete-comment="${escapeHtml(comment.id)}" data-track-id="${escapeHtml(track.id)}">Apagar</button></div><form class="track-comment-edit-form" data-comment-edit="${escapeHtml(comment.id)}" data-track-id="${escapeHtml(track.id)}" hidden><textarea name="body" rows="2" maxlength="2000" required>${escapeHtml(comment.body)}</textarea><div><button type="submit">Guardar</button><button type="button" data-cancel-comment-edit>Cancelar</button></div></form>` : '';
+    return `<article data-comment-id="${escapeHtml(comment.id || '')}" data-comment-version="${escapeHtml(versionId)}" ${visible ? '' : 'hidden'}><div class="track-comment-meta"><b>${comment.authorType === 'admin' ? 'Trap Houze' : 'Tu'}</b><button type="button" data-comment-seek="${Number(comment.positionSeconds || 0)}" data-comment-version="${escapeHtml(versionId)}" data-track-id="${escapeHtml(track.id)}">${escapeHtml(versionLabels.get(versionId) || 'Versão')} · ${formatAudioTime(comment.positionSeconds)}</button></div><p data-comment-body>${escapeHtml(comment.body)}</p>${ownActions}</article>`;
   }).join('')}</div><p class="track-empty" data-comment-empty ${initialComments.length ? 'hidden' : ''}>Sem comentários nesta versão.</p>${latest ? `<form class="track-comment-form" data-track-comment="${escapeHtml(track.id)}"><input type="hidden" name="versionId" value="${escapeHtml(latest.id)}"><input type="hidden" name="positionSeconds" value="0"><p class="track-comment-context" data-comment-context>Comentário em <b>${escapeHtml(latest.label)}</b> · <span>0:00</span></p><textarea name="body" rows="2" maxlength="2000" placeholder="Comenta o ponto atual desta versão" required></textarea><button type="submit">Comentar</button></form>` : '<p class="track-empty">Os comentários ficam disponíveis quando existir uma versão.</p>'}</div>`;
   return `<article class="track-card">
     <div class="track-heading"><p class="eyebrow">${trackServiceLabel(track)}</p><h2>${escapeHtml(track.title)}</h2></div>
     ${stagesPanel}
     ${renderTrackPlayer(track, versions)}
-    ${track.category === 'recording' ? '' : `<div class="track-payment ${track.paymentStatus}"><span>${paymentLabel(track)}</span>${track.due === 0 ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.due)}</button>`}</div>`}
-    ${commentsPanel}
+    ${track.category === 'recording' ? '' : `<div class="track-payment ${track.paymentStatus}">${paymentLabel(track) ? `<span>${paymentLabel(track)}</span>` : ''}${track.due === 0 ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.due)}</button>`}</div>`}
+    <button type="button" class="track-comments-toggle" data-toggle-track-comments="${escapeHtml(track.id)}" aria-expanded="${commentsOpen ? 'true' : 'false'}">Comentários <span>${comments.length}</span></button>${commentsPanel}
   </article>`;
 }
 
@@ -120,7 +125,7 @@ function renderBooking(booking) {
   const display = bookingDisplay(booking);
   const hasAmount = Number(booking.amount || 0) > 0;
   const payment = hasAmount
-    ? `<span>${paymentLabel(booking)}</span>${booking.due > 0 ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">Pagar ${money(booking.due)}</button>` : ''}`
+    ? `${paymentLabel(booking) ? `<span>${paymentLabel(booking)}</span>` : ''}${booking.due > 0 ? `<button type="button" data-payment-url="${escapeHtml(booking.paymentUrl || '')}">Pagar ${money(booking.due)}</button>` : ''}`
     : '<span class="booking-payment-unset">Pagamento a definir</span>';
   const reschedule = booking.appointmentId && bookingMoment(booking) >= new Date() ? `<a class="booking-reschedule" href="/booking.html?reschedule=${encodeURIComponent(booking.appointmentId)}">Reagendar →</a>` : '';
   const cancel = booking.appointmentId && bookingMoment(booking) >= new Date() ? `<button type="button" class="booking-cancel" data-cancel-reservation="${escapeHtml(booking.appointmentId)}">Cancelar</button>` : '';
@@ -331,6 +336,39 @@ document.addEventListener('click', event => {
   if (tab) { musicTab = tab.dataset.musicTab; submittingTrack = false; renderPortal(); return; }
   if (event.target.closest('[data-open-track-submit]')) { submittingTrack = true; renderPortal(); return; }
   if (event.target.closest('[data-close-track-submit]')) { submittingTrack = false; renderPortal(); return; }
+  const commentsToggle = event.target.closest('[data-toggle-track-comments]');
+  if (commentsToggle) {
+    const trackId = commentsToggle.dataset.toggleTrackComments;
+    const panel = commentsToggle.nextElementSibling;
+    const opening = panel?.hidden !== false;
+    if (panel) panel.hidden = !opening;
+    commentsToggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    if (opening) openTrackComments.add(trackId); else openTrackComments.delete(trackId);
+    return;
+  }
+  const editComment = event.target.closest('[data-edit-comment]');
+  if (editComment) {
+    const article = editComment.closest('[data-comment-id]');
+    article.querySelector('[data-comment-body]').hidden = true;
+    article.querySelector('[data-comment-actions]').hidden = true;
+    article.querySelector('[data-comment-edit]').hidden = false;
+    return;
+  }
+  const cancelCommentEdit = event.target.closest('[data-cancel-comment-edit]');
+  if (cancelCommentEdit) {
+    const article = cancelCommentEdit.closest('[data-comment-id]');
+    article.querySelector('[data-comment-body]').hidden = false;
+    article.querySelector('[data-comment-actions]').hidden = false;
+    article.querySelector('[data-comment-edit]').hidden = true;
+    return;
+  }
+  const deleteComment = event.target.closest('[data-delete-comment]');
+  if (deleteComment) {
+    if (!window.confirm('Apagar este comentário?')) return;
+    deleteComment.disabled = true;
+    apiRequest(`/client/tracks/${encodeURIComponent(deleteComment.dataset.trackId)}/comments/${encodeURIComponent(deleteComment.dataset.deleteComment)}`, { method: 'DELETE' }).then(refreshPortal).catch(error => { deleteComment.disabled = false; alert(error.message); });
+    return;
+  }
   const version = event.target.closest('[data-player-version]');
   if (version) {
     loadTrackVersion(version.closest('[data-track-player]'), version);
@@ -397,6 +435,14 @@ document.addEventListener('submit', event => {
       }
       submittingTrack = false; return refreshPortal();
     }).catch(error => { button.disabled = false; alert(error.message); });
+    return;
+  }
+  const commentEdit = event.target.closest('[data-comment-edit]');
+  if (commentEdit) {
+    event.preventDefault();
+    const button = commentEdit.querySelector('button[type="submit"]');
+    button.disabled = true;
+    apiRequest(`/client/tracks/${encodeURIComponent(commentEdit.dataset.trackId)}/comments/${encodeURIComponent(commentEdit.dataset.commentEdit)}`, { method: 'PATCH', body: JSON.stringify({ body: new FormData(commentEdit).get('body') }) }).then(refreshPortal).catch(error => { button.disabled = false; alert(error.message); });
     return;
   }
   const comment = event.target.closest('[data-track-comment]');

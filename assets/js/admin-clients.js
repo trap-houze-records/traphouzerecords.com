@@ -21,6 +21,7 @@ window.ClientAdminModule = (() => {
     let portal;
     const revealedPasswords = new Map();
     const adminAudioUrls = new Map();
+    const openAdminComments = new Set();
     const mixServices = options.mixMasterServices || [];
 
     function generatePassword() {
@@ -61,16 +62,17 @@ window.ClientAdminModule = (() => {
       const versionRows = versions.map(version => `<div class="manager-track-version"><div><b>${escapeHtml(version.label)}</b><small>${escapeHtml(version.originalName)}</small></div><div><button type="button" data-admin-version-play="${escapeHtml(version.id)}" data-version-label="${escapeHtml(version.label)}" data-track-id="${escapeHtml(item.id)}">Ouvir</button><button type="button" class="danger" data-admin-version-delete="${escapeHtml(version.id)}" data-track-id="${escapeHtml(item.id)}">Apagar</button></div></div>`).join('');
       const commentRows = comments.map(comment => {
         const versionId = comment.versionId || versions[0]?.id || '';
-        return `<article class="manager-track-comment"><button type="button" data-admin-comment-seek="${Number(comment.positionSeconds || 0)}" data-version-id="${escapeHtml(versionId)}" data-track-id="${escapeHtml(item.id)}">${escapeHtml(versionLabels.get(versionId) || 'Versão')} · ${formatSeconds(comment.positionSeconds)}</button><div><b>${comment.authorType === 'admin' ? 'Trap Houze' : 'Artista'}</b><p>${escapeHtml(comment.body)}</p></div></article>`;
+        return `<article class="manager-track-comment" data-admin-comment-row="${escapeHtml(comment.id)}"><button type="button" data-admin-comment-seek="${Number(comment.positionSeconds || 0)}" data-version-id="${escapeHtml(versionId)}" data-track-id="${escapeHtml(item.id)}">${escapeHtml(versionLabels.get(versionId) || 'Versão')} · ${formatSeconds(comment.positionSeconds)}</button><div><b>${comment.authorType === 'admin' ? 'Trap Houze' : 'Artista'}</b><p data-admin-comment-body>${escapeHtml(comment.body)}</p><div class="manager-track-comment-actions" data-admin-comment-actions><button type="button" data-admin-comment-edit-open="${escapeHtml(comment.id)}">Editar</button><button type="button" class="danger" data-admin-comment-delete="${escapeHtml(comment.id)}" data-track-id="${escapeHtml(item.id)}">Apagar</button></div><form data-admin-comment-edit="${escapeHtml(comment.id)}" data-track-id="${escapeHtml(item.id)}" hidden><textarea name="body" rows="2" maxlength="2000" required>${escapeHtml(comment.body)}</textarea><div><button type="submit">Guardar</button><button type="button" data-admin-comment-edit-cancel>Cancelar</button></div></form></div></article>`;
       }).join('');
       const versionOptions = versions.map(version => `<option value="${escapeHtml(version.id)}">${escapeHtml(version.label)} · ${escapeHtml(version.originalName)}</option>`).join('');
+      const commentsOpen = openAdminComments.has(item.id);
       return `<article class="manager-record" data-item="${type}" data-id="${item.id}">
         <div class="manager-record-top"><strong>${track ? 'Música' : 'Reserva'}</strong><button type="button" data-delete="${type}" data-id="${item.id}" aria-label="Remover">×</button></div>
         <label class="admin-field"><span>${label}</span><input data-field="${name}" value="${escapeHtml(item[name])}"></label>
         ${track ? `<div class="manager-record-grid"><label class="admin-field"><span>Área</span><select data-field="category"><option value="mix-master" ${item.category !== 'recording' ? 'selected' : ''}>Mix & Master</option><option value="recording" ${item.category === 'recording' ? 'selected' : ''}>Gravações</option></select></label><label class="admin-field"><span>Fase</span><select data-field="stage">${[['start', 'Iniciar'], ['mix', 'Mix'], ['master', 'Master']].map(([value, text]) => `<option value="${value}" ${item.stage === value ? 'selected' : ''}>${text}</option>`).join('')}</select></label></div><div class="manager-record-grid"><label class="admin-field"><span>Serviço pedido</span><select data-field="requestedService"><option value="">Sem pedido</option>${mixServices.map(service => `<option value="${escapeHtml(service.id)}" ${item.requestedService === service.id ? 'selected' : ''}>${escapeHtml(service.title)}</option>`).join('')}</select></label><label class="admin-field"><span>Gravação de origem</span><select data-field="sourceTrackId"><option value="">Nenhuma</option>${recordingOptions}</select></label></div>` : `<label class="admin-field"><span>Data e hora</span><input type="datetime-local" data-field="startsAt" value="${escapeHtml((item.startsAt || '').replace(' ', 'T').slice(0, 16))}"></label>`}
         <div class="manager-record-grid"><label class="admin-field"><span>Valor (€)</span><input type="number" step="0.01" min="0" data-field="amount" value="${numericAmount(item.amountCents)}"></label><label class="admin-field"><span>Recebido (€)</span><input type="number" step="0.01" min="0" data-field="paidAmount" value="${payment.paid.toFixed(2)}"></label></div>
        <label class="admin-field"><span>Link de pagamento</span><input type="url" data-field="paymentUrl" value="${escapeHtml(item.paymentUrl || '')}" placeholder="https://"></label>
-        ${track ? `<div class="manager-track-workspace"><strong>Versões no Trap Houze Player (${versions.length})</strong><div class="manager-track-version-list">${versionRows || '<small>Sem versões carregadas.</small>'}</div>${versions.length ? `<audio controls preload="none" data-admin-track-audio="${escapeHtml(item.id)}"></audio><small data-admin-track-time>Escolhe uma versão para ouvir.</small>` : ''}<form data-admin-track-upload="${escapeHtml(item.id)}"><input name="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/mp4,audio/aac,audio/ogg" required><input name="label" maxlength="120" placeholder="Nome da versão"><button type="submit">Enviar versão</button></form></div><div class="manager-track-workspace"><strong>Comentários por versão (${comments.length})</strong>${commentRows || '<small>Sem comentários.</small>'}${versions.length ? `<form data-admin-track-comment="${escapeHtml(item.id)}"><select name="versionId" required>${versionOptions}</select><input name="body" maxlength="2000" placeholder="Comentar o ponto atual" required><button type="submit">Comentar</button><small>O comentário fica associado à versão escolhida e ao tempo atual do player.</small></form>` : '<small>Adiciona uma versão antes de comentar.</small>'}</div>` : ''}
+        ${track ? `<div class="manager-track-workspace"><strong>Versões no Trap Houze Player (${versions.length})</strong><div class="manager-track-version-list">${versionRows || '<small>Sem versões carregadas.</small>'}</div>${versions.length ? `<audio controls preload="none" data-admin-track-audio="${escapeHtml(item.id)}"></audio><small data-admin-track-time>Escolhe uma versão para ouvir.</small>` : ''}<form data-admin-track-upload="${escapeHtml(item.id)}"><input name="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/mp4,audio/aac,audio/ogg" required><input name="label" maxlength="120" placeholder="Nome da versão"><button type="submit">Enviar versão</button></form></div><div class="manager-track-workspace manager-track-comments"><button type="button" class="manager-comments-toggle" data-toggle-admin-comments="${escapeHtml(item.id)}" aria-expanded="${commentsOpen ? 'true' : 'false'}"><strong>Comentários</strong><span>${comments.length}</span></button><div data-admin-comments-panel ${commentsOpen ? '' : 'hidden'}>${commentRows || '<small>Sem comentários.</small>'}${versions.length ? `<form data-admin-track-comment="${escapeHtml(item.id)}"><select name="versionId" required>${versionOptions}</select><input name="body" maxlength="2000" placeholder="Comentar o ponto atual" required><button type="submit">Comentar</button><small>O comentário fica associado à versão escolhida e ao tempo atual do player.</small></form>` : '<small>Adiciona uma versão antes de comentar.</small>'}</div></div>` : ''}
        <p class="admin-hint">${payment.label}</p>
        <button type="button" class="manager-copy" data-save-record>Guardar ${track ? 'música' : 'reserva'}</button>
       </article>`;
@@ -210,6 +212,37 @@ window.ClientAdminModule = (() => {
         if (!window.confirm('Apagar esta versão e todos os comentários associados?')) return;
         return api(`/client/admin/tracks/${encodeURIComponent(deleteVersion.dataset.trackId)}/versions/${encodeURIComponent(deleteVersion.dataset.adminVersionDelete)}`, { method: 'DELETE', body: JSON.stringify({}) }).then(() => { options.onNotice?.('Versão apagada.', 'success'); return refresh(); }).catch(options.onError);
       }
+      const commentsToggle = event.target.closest('[data-toggle-admin-comments]');
+      if (commentsToggle) {
+        const trackId = commentsToggle.dataset.toggleAdminComments;
+        const panel = commentsToggle.nextElementSibling;
+        const opening = panel?.hidden !== false;
+        if (panel) panel.hidden = !opening;
+        commentsToggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+        if (opening) openAdminComments.add(trackId); else openAdminComments.delete(trackId);
+        return;
+      }
+      const editComment = event.target.closest('[data-admin-comment-edit-open]');
+      if (editComment) {
+        const row = editComment.closest('[data-admin-comment-row]');
+        row.querySelector('[data-admin-comment-body]').hidden = true;
+        row.querySelector('[data-admin-comment-actions]').hidden = true;
+        row.querySelector('[data-admin-comment-edit]').hidden = false;
+        return;
+      }
+      const cancelCommentEdit = event.target.closest('[data-admin-comment-edit-cancel]');
+      if (cancelCommentEdit) {
+        const row = cancelCommentEdit.closest('[data-admin-comment-row]');
+        row.querySelector('[data-admin-comment-body]').hidden = false;
+        row.querySelector('[data-admin-comment-actions]').hidden = false;
+        row.querySelector('[data-admin-comment-edit]').hidden = true;
+        return;
+      }
+      const deleteComment = event.target.closest('[data-admin-comment-delete]');
+      if (deleteComment) {
+        if (!window.confirm('Apagar este comentário?')) return;
+        return api(`/client/admin/tracks/${encodeURIComponent(deleteComment.dataset.trackId)}/comments/${encodeURIComponent(deleteComment.dataset.adminCommentDelete)}`, { method: 'DELETE', body: JSON.stringify({}) }).then(() => { options.onNotice?.('Comentário apagado.', 'success'); return refresh(); }).catch(options.onError);
+      }
       const remove = event.target.closest('[data-delete]');
       if (remove && window.confirm('Remover este registo?')) return api(`/client/admin/${remove.dataset.delete}/${remove.dataset.id}`, { method: 'DELETE', body: JSON.stringify({}) }).then(() => refresh()).catch(options.onError);
       const saveRecord = event.target.closest('[data-save-record]');
@@ -230,6 +263,12 @@ window.ClientAdminModule = (() => {
         event.preventDefault();
         const button = upload.querySelector('button'); button.disabled = true;
         return fetch(`${apiBase}/client/admin/tracks/${encodeURIComponent(upload.dataset.adminTrackUpload)}/versions`, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}`, 'X-CMS-CSRF': getCsrf() }, body: new FormData(upload) }).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Não foi possível enviar a versão.'); return refresh(); }).catch(options.onError).finally(() => { button.disabled = false; });
+      }
+      const commentEdit = event.target.closest('[data-admin-comment-edit]');
+      if (commentEdit) {
+        event.preventDefault();
+        const button = commentEdit.querySelector('button[type="submit"]'); button.disabled = true;
+        return api(`/client/admin/tracks/${encodeURIComponent(commentEdit.dataset.trackId)}/comments/${encodeURIComponent(commentEdit.dataset.adminCommentEdit)}`, { method: 'PATCH', body: JSON.stringify({ body: new FormData(commentEdit).get('body') }) }).then(() => { options.onNotice?.('Comentário atualizado.', 'success'); return refresh(); }).catch(options.onError).finally(() => { button.disabled = false; });
       }
       const comment = event.target.closest('[data-admin-track-comment]');
       if (comment) {
