@@ -1219,8 +1219,10 @@ footer p {
 .track-player-versions button:hover { border-color: rgba(22,199,243,.55); color: #fff; }
 .track-player-versions button.active { background: #16c7f3; border-color: #16c7f3; color: #06131b; font-weight: 700; }
 .track-player-controls { align-items: center; display: grid; gap: 10px; grid-template-columns: auto auto minmax(80px, 1fr) auto; }
-.track-player-toggle { background: #16c7f3; border: 1px solid #16c7f3; color: #06131b; cursor: pointer; font: inherit; font-size: .75rem; font-weight: 700; min-width: 84px; padding: 9px 11px; }
+.track-player-toggle { align-items: center; background: #16c7f3; border: 1px solid #16c7f3; border-radius: 50%; color: #06131b; cursor: pointer; display: inline-flex; height: 38px; justify-content: center; min-width: 38px; padding: 0; width: 38px; }
+.track-player-toggle::before { border-bottom: 7px solid transparent; border-left: 11px solid currentColor; border-top: 7px solid transparent; content: ""; height: 0; margin-left: 3px; width: 0; }
 .track-player-toggle.playing { background: transparent; color: #16c7f3; }
+.track-player-toggle.playing::before { border: 0; border-left: 3px solid currentColor; border-right: 3px solid currentColor; box-sizing: border-box; height: 14px; margin-left: 0; width: 11px; }
 .track-player-controls span { color: rgba(255,255,255,.82); font-size: .72rem; font-variant-numeric: tabular-nums; }
 .track-player-controls input[type="range"] { --track-progress: 0%; appearance: none; background: linear-gradient(90deg, #16c7f3 var(--track-progress), rgba(255,255,255,.22) var(--track-progress)); cursor: pointer; height: 3px; margin: 0; min-width: 0; padding: 0; width: 100%; }
 .track-player-controls input[type="range"]::-webkit-slider-thumb { appearance: none; background: #fff; border: 2px solid #16c7f3; border-radius: 50%; height: 13px; width: 13px; }
@@ -1511,8 +1513,8 @@ footer p {
     .track-player-identity { grid-template-columns: 40px minmax(0, 1fr); }
     .track-player-identity img { height: 40px; width: 40px; }
     .track-player-download { justify-self: start; padding: 7px 8px; }
-    .track-player-controls { grid-template-columns: auto 1fr auto; }
-    .track-player-toggle { grid-column: 1 / -1; justify-self: start; }
+    .track-player-controls { grid-template-columns: auto auto minmax(60px, 1fr) auto; }
+    .track-player-toggle { grid-column: auto; justify-self: auto; }
     .client-simple-help { align-items: flex-start; flex-direction: column; }
     .client-artist-profile-body, .client-artist-form > div { grid-template-columns: 1fr; }
     .client-artist-photo { max-width: 250px; }

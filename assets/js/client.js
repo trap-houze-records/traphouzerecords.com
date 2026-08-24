@@ -78,7 +78,7 @@ function renderTrackPlayer(track, versions) {
     </div>
     <audio preload="metadata" data-track-audio="${escapeHtml(track.id)}" data-version-audio="${escapeHtml(active.id)}"></audio>
     <div class="track-player-controls">
-      <button type="button" class="track-player-toggle" data-player-toggle>Reproduzir</button>
+      <button type="button" class="track-player-toggle" data-player-toggle aria-label="Reproduzir" title="Reproduzir"></button>
       <span data-player-current>0:00</span>
       <input type="range" min="0" max="1000" value="0" step="1" aria-label="Posição na música" data-player-progress>
       <span data-player-duration>--:--</span>
@@ -200,7 +200,9 @@ function updateTrackPlayerProgress(player) {
 function setTrackPlayerState(player, playing) {
   const toggle = player.querySelector('[data-player-toggle]');
   if (!toggle) return;
-  toggle.textContent = playing ? 'Pausa' : 'Reproduzir';
+  const label = playing ? 'Pausa' : 'Reproduzir';
+  toggle.setAttribute('aria-label', label);
+  toggle.title = label;
   toggle.classList.toggle('playing', playing);
 }
 function syncTrackComments(player, versionButton) {
