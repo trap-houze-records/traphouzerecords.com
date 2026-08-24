@@ -63,7 +63,7 @@ function trackServiceLabel(track) {
 }
 function versionFileSize(size) { return Number(size || 0) >= 1024 * 1024 ? `${(Number(size) / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(Number(size || 0) / 1024))} KB`; }
 function renderTrackPlayer(track, versions) {
-  if (!versions.length) return '<div class="track-player-empty"><strong>Sem áudio disponível</strong><span>Carrega a primeira versão para ativar o player.</span></div>';
+  if (!versions.length) return '<div class="track-player-empty"><strong>Sem áudio disponível</strong><span>A Trap Houze ainda não adicionou uma versão a esta música.</span></div>';
   const active = versions[0];
   return `<section class="track-player" data-track-player="${escapeHtml(track.id)}">
     <div class="track-player-heading">
@@ -86,19 +86,26 @@ function renderTrackPlayer(track, versions) {
 function renderTrack(track) {
   const versions = track.versions || [];
   const comments = track.comments || [];
+  const latest = versions[0];
   const stagesPanel = track.category === 'recording' ? '' : `<div class="track-stages" aria-label="Estado do trabalho">${stages.map(([id, label], index) => {
     const activeIndex = stages.findIndex(([stage]) => stage === String(track.stage).toLowerCase());
     const state = index < activeIndex ? 'complete' : index === activeIndex ? 'current' : '';
     return `<div class="track-stage ${state}"><span>${index + 1}</span><strong>${label}</strong></div>`;
   }).join('')}</div>`;
-  const versionsPanel = `<div class="track-workspace track-version-upload"><div class="track-workspace-heading"><strong>Adicionar nova versão</strong><span>${versions.length}</span></div><form class="track-upload-form" data-track-upload="${escapeHtml(track.id)}"><label>Ficheiro de áudio<input name="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/mp4,audio/aac,audio/ogg" required></label><input name="label" maxlength="120" placeholder="Ex.: V4 · revisão"><button type="submit">Enviar</button></form></div>`;
-  const commentsPanel = `<div class="track-workspace track-comments"><div class="track-workspace-heading"><strong>Comentários</strong><span>${comments.length}</span></div>${comments.length ? comments.map(comment => `<article><b>${comment.authorType === 'admin' ? 'Trap Houze' : 'Tu'}</b><p>${escapeHtml(comment.body)}</p></article>`).join('') : '<p class="track-empty">Sem comentários por agora.</p>'}<form class="track-comment-form" data-track-comment="${escapeHtml(track.id)}"><textarea name="body" rows="2" maxlength="2000" placeholder="Deixa uma nota sobre esta música ou versão"></textarea><button type="submit">Comentar</button></form></div>`;
+  const initialVersionId = latest?.id || '';
+  const initialComments = comments.filter(comment => (comment.versionId || initialVersionId) === initialVersionId);
+  const versionLabels = new Map(versions.map(version => [version.id, version.label]));
+  const commentsPanel = `<div class="track-workspace track-comments" data-track-comments><div class="track-workspace-heading"><strong>Comentários da versão</strong><span data-comment-count>${initialComments.length}</span></div><div data-track-comment-list>${comments.map(comment => {
+    const versionId = comment.versionId || initialVersionId;
+    const visible = versionId === initialVersionId;
+    return `<article data-comment-version="${escapeHtml(versionId)}" ${visible ? '' : 'hidden'}><div class="track-comment-meta"><b>${comment.authorType === 'admin' ? 'Trap Houze' : 'Tu'}</b><button type="button" data-comment-seek="${Number(comment.positionSeconds || 0)}" data-comment-version="${escapeHtml(versionId)}" data-track-id="${escapeHtml(track.id)}">${escapeHtml(versionLabels.get(versionId) || 'Versão')} · ${formatAudioTime(comment.positionSeconds)}</button></div><p>${escapeHtml(comment.body)}</p></article>`;
+  }).join('')}</div><p class="track-empty" data-comment-empty ${initialComments.length ? 'hidden' : ''}>Sem comentários nesta versão.</p>${latest ? `<form class="track-comment-form" data-track-comment="${escapeHtml(track.id)}"><input type="hidden" name="versionId" value="${escapeHtml(latest.id)}"><input type="hidden" name="positionSeconds" value="0"><p class="track-comment-context" data-comment-context>Comentário em <b>${escapeHtml(latest.label)}</b> · <span>0:00</span></p><textarea name="body" rows="2" maxlength="2000" placeholder="Comenta o ponto atual desta versão" required></textarea><button type="submit">Comentar</button></form>` : '<p class="track-empty">Os comentários ficam disponíveis quando existir uma versão.</p>'}</div>`;
   return `<article class="track-card">
     <div class="track-heading"><p class="eyebrow">${trackServiceLabel(track)}</p><h2>${escapeHtml(track.title)}</h2></div>
     ${stagesPanel}
     ${renderTrackPlayer(track, versions)}
     ${track.category === 'recording' ? '' : `<div class="track-payment ${track.paymentStatus}"><span>${paymentLabel(track)}</span>${track.due === 0 ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.due)}</button>`}</div>`}
-    ${versionsPanel}${commentsPanel}
+    ${commentsPanel}
   </article>`;
 }
 
@@ -145,12 +152,12 @@ const bookings = splitBookings(clientData.bookings);
 const musicTracks = clientData.tracks.filter(track => (track.category || 'mix-master') === musicTab);
 const recordings = clientData.tracks.filter(track => track.category === 'recording');
 const serviceOptions = (clientData.mixMasterServices || []).map(service => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.title)} · ${money(service.price)}</option>`).join('');
-const submitPanel = submittingTrack ? `<form id="trackSubmissionForm" class="track-submission"><div><p class="eyebrow">Novo pedido</p><h3>${musicTab === 'recording' ? 'Enviar gravação' : 'Pedir Mix & Master'}</h3></div><label>Nome da música<input name="title" maxlength="180" required></label>${musicTab === 'mix-master' ? `<label>Serviço<select name="requestedService" required>${serviceOptions}</select></label><label>Usar uma gravação existente<select name="sourceTrackId"><option value="">Enviar novo ficheiro</option>${recordings.map(track => `<option value="${escapeHtml(track.id)}">${escapeHtml(track.title)}</option>`).join('')}</select></label>` : ''}<label>Ficheiro de áudio${musicTab === 'recording' ? '<input name="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/mp4,audio/aac,audio/ogg" required>' : '<input name="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/mp4,audio/aac,audio/ogg">'}</label><div class="track-submission-actions"><button type="submit">Submeter <span>→</span></button><button type="button" class="client-link" data-close-track-submit>Cancelar</button></div></form>` : '';
+const submitPanel = submittingTrack && musicTab === 'mix-master' ? `<form id="trackSubmissionForm" class="track-submission"><div><p class="eyebrow">Novo pedido</p><h3>Pedir Mix & Master</h3></div><label>Nome da música<input name="title" maxlength="180" required></label><label>Serviço<select name="requestedService" required>${serviceOptions}</select></label><label>Usar uma gravação existente<select name="sourceTrackId"><option value="">Enviar novo ficheiro</option>${recordings.map(track => `<option value="${escapeHtml(track.id)}">${escapeHtml(track.title)}</option>`).join('')}</select></label><label>Ficheiro de áudio<input name="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/mp4,audio/aac,audio/ogg"></label><div class="track-submission-actions"><button type="submit">Submeter <span>→</span></button><button type="button" class="client-link" data-close-track-submit>Cancelar</button></div></form>` : '';
 portal.innerHTML = `<div class="client-shell client-simple">
   <header class="client-header"><a class="client-brand" href="/" aria-label="Trap Houze Records"><img src="/images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div class="client-user"><span>Olá, ${escapeHtml(clientData.client)}</span>${apiBase ? '<a class="client-book-session" href="/booking.html">Agendar sessão</a><button class="client-book-session" type="button" data-open-track-submit>Mix & Master</button>' : ''}<button class="client-signout" type="button">Sair</button></div></header>
   <section class="client-simple-hero"><p class="eyebrow">O teu trabalho</p><h1>A tua agenda</h1><p>Reservas, músicas e pagamentos num só lugar.</p></section>
   <section class="booking-section booking-section-upcoming"><div class="booking-section-heading"><div><p class="eyebrow">Próximas sessões</p><h2>Reservas futuras</h2></div><span>${bookings.upcoming.length} agendadas</span></div><div class="booking-list">${bookings.upcoming.map(renderBooking).join('') || '<p class="client-empty">Ainda não tens reservas futuras.</p>'}</div></section>
-  <section class="track-section"><div class="booking-section-heading"><div><p class="eyebrow">Música</p><h2>As tuas faixas</h2></div><button type="button" class="client-book-session" data-open-track-submit>${musicTab === 'recording' ? '+ Gravação' : '+ Mix & Master'}</button></div><div class="track-tabs" role="tablist"><button type="button" class="${musicTab === 'mix-master' ? 'active' : ''}" data-music-tab="mix-master">Mix & Master <span>${clientData.tracks.filter(track => (track.category || 'mix-master') === 'mix-master').length}</span></button><button type="button" class="${musicTab === 'recording' ? 'active' : ''}" data-music-tab="recording">Gravações <span>${recordings.length}</span></button></div>${submitPanel}<div class="track-list">${musicTracks.map(renderTrack).join('') || `<p class="client-empty">${musicTab === 'recording' ? 'Ainda não tens gravações guardadas.' : 'Ainda não tens músicas em Mix & Master.'}</p>`}</div></section>
+  <section class="track-section"><div class="booking-section-heading"><div><p class="eyebrow">Música</p><h2>As tuas faixas</h2></div>${musicTab === 'mix-master' ? '<button type="button" class="client-book-session" data-open-track-submit>+ Mix & Master</button>' : ''}</div><div class="track-tabs" role="tablist"><button type="button" class="${musicTab === 'mix-master' ? 'active' : ''}" data-music-tab="mix-master">Mix & Master <span>${clientData.tracks.filter(track => (track.category || 'mix-master') === 'mix-master').length}</span></button><button type="button" class="${musicTab === 'recording' ? 'active' : ''}" data-music-tab="recording">Gravações <span>${recordings.length}</span></button></div>${submitPanel}<div class="track-list">${musicTracks.map(renderTrack).join('') || `<p class="client-empty">${musicTab === 'recording' ? 'Ainda não tens gravações guardadas.' : 'Ainda não tens músicas em Mix & Master.'}</p>`}</div></section>
   <section class="booking-section booking-section-history"><div class="booking-section-heading"><div><p class="eyebrow">Histórico</p><h2>Reservas anteriores</h2></div><span>${bookings.history.length} concluídas</span></div><div class="booking-list">${bookings.history.map(renderBooking).join('') || '<p class="client-empty">Ainda não existem reservas anteriores.</p>'}</div></section>
   ${renderArtistProfile(clientData.artistProfile)}
   <aside class="client-simple-help"><span>Precisas de ajuda?</span><a href="https://wa.me/351910734914" target="_blank" rel="noopener">Abrir WhatsApp <b>→</b></a></aside>
@@ -183,6 +190,7 @@ function updateTrackPlayerProgress(player) {
   progress.style.setProperty('--track-progress', `${Number(progress.value) / 10}%`);
   player.querySelector('[data-player-current]').textContent = formatAudioTime(audio.currentTime);
   player.querySelector('[data-player-duration]').textContent = duration ? formatAudioTime(duration) : '--:--';
+  updateTrackCommentPosition(player);
 }
 function setTrackPlayerState(player, playing) {
   const toggle = player.querySelector('[data-player-toggle]');
@@ -190,7 +198,37 @@ function setTrackPlayerState(player, playing) {
   toggle.textContent = playing ? 'Pausa' : 'Reproduzir';
   toggle.classList.toggle('playing', playing);
 }
-async function loadTrackVersion(player, versionButton, autoplay = false) {
+function syncTrackComments(player, versionButton) {
+  const panel = player.closest('.track-card')?.querySelector('[data-track-comments]');
+  if (!panel || !versionButton) return;
+  const versionId = versionButton.dataset.playerVersion;
+  const rows = [...panel.querySelectorAll('article[data-comment-version]')];
+  let visible = 0;
+  rows.forEach(row => {
+    const show = row.dataset.commentVersion === versionId;
+    row.hidden = !show;
+    if (show) visible += 1;
+  });
+  panel.querySelector('[data-comment-count]').textContent = visible;
+  panel.querySelector('[data-comment-empty]').hidden = visible > 0;
+  const form = panel.querySelector('[data-track-comment]');
+  if (!form) return;
+  form.elements.versionId.value = versionId;
+  form.elements.positionSeconds.value = '0';
+  const context = form.querySelector('[data-comment-context]');
+  context.innerHTML = `Comentário em <b>${escapeHtml(versionButton.dataset.versionLabel || 'Versão')}</b> · <span>0:00</span>`;
+}
+function updateTrackCommentPosition(player) {
+  const audio = player.querySelector('[data-track-audio]');
+  const form = player.closest('.track-card')?.querySelector('[data-track-comment]');
+  if (!audio || !form || form.elements.versionId.value !== audio.dataset.versionAudio) return;
+  const seconds = Math.max(0, Math.floor(Number(audio.currentTime || 0)));
+  form.elements.positionSeconds.value = String(seconds);
+  const time = form.querySelector('[data-comment-context] span');
+  if (time) time.textContent = formatAudioTime(seconds);
+}
+async function loadTrackVersion(player, versionButton, options = {}) {
+  const { autoplay = false, seekSeconds = null } = options;
   const audio = player.querySelector('[data-track-audio]');
   if (!audio || !versionButton) return;
   const trackId = versionButton.dataset.trackId;
@@ -202,6 +240,7 @@ async function loadTrackVersion(player, versionButton, autoplay = false) {
     button.classList.toggle('active', active);
     button.setAttribute('aria-selected', active ? 'true' : 'false');
   });
+  syncTrackComments(player, versionButton);
   player.querySelector('[data-player-filename]').textContent = versionButton.dataset.versionName || '';
   player.querySelector('[data-player-filemeta]').textContent = `${versionButton.dataset.versionLabel || ''} · ${versionButton.dataset.versionSize || ''}`;
   const download = player.querySelector('[data-download-version]');
@@ -224,6 +263,14 @@ async function loadTrackVersion(player, versionButton, autoplay = false) {
     audio.src = url;
     audio.load();
     status.textContent = versionButton.dataset.versionName || 'Versão pronta';
+    if (seekSeconds !== null) {
+      await new Promise(resolve => {
+        const seek = () => { audio.currentTime = Math.min(Number(seekSeconds || 0), Number.isFinite(audio.duration) ? audio.duration : Number(seekSeconds || 0)); resolve(); };
+        if (audio.readyState >= 1) seek();
+        else audio.addEventListener('loadedmetadata', seek, { once: true });
+      });
+      updateTrackPlayerProgress(player);
+    }
     if (autoplay) await audio.play();
   } catch (error) {
     if (player.dataset.playerRequest === requestId) status.textContent = error.message || 'Não foi possível carregar esta versão.';
@@ -294,9 +341,17 @@ document.addEventListener('click', event => {
     const player = toggle.closest('[data-track-player]');
     const audio = player?.querySelector('[data-track-audio]');
     if (!audio) return;
-    if (!audio.src) loadTrackVersion(player, player.querySelector('[data-player-version].active'), true);
+    if (!audio.src) loadTrackVersion(player, player.querySelector('[data-player-version].active'), { autoplay: true });
     else if (audio.paused) audio.play().catch(() => {});
     else audio.pause();
+    return;
+  }
+  const commentSeek = event.target.closest('[data-comment-seek]');
+  if (commentSeek) {
+    const card = commentSeek.closest('.track-card');
+    const player = card?.querySelector('[data-track-player]');
+    const versionButton = player?.querySelector(`[data-player-version="${commentSeek.dataset.commentVersion}"]`);
+    if (player && versionButton) loadTrackVersion(player, versionButton, { autoplay: true, seekSeconds: Number(commentSeek.dataset.commentSeek || 0) });
     return;
   }
   const download = event.target.closest('[data-download-version]');
@@ -332,7 +387,7 @@ document.addEventListener('submit', event => {
     const form = new FormData(event.target);
     const button = event.target.querySelector('button[type="submit"]');
     button.disabled = true;
-    const category = musicTab;
+    const category = 'mix-master';
     apiRequest('/client/tracks', { method: 'POST', body: JSON.stringify({ title: form.get('title'), category, requestedService: form.get('requestedService'), sourceTrackId: form.get('sourceTrackId') }) }).then(async track => {
       const file = form.get('file');
       if (file instanceof File && file.size) {
@@ -344,16 +399,10 @@ document.addEventListener('submit', event => {
     }).catch(error => { button.disabled = false; alert(error.message); });
     return;
   }
-  const upload = event.target.closest('[data-track-upload]');
-  if (upload) {
-    event.preventDefault(); const form = new FormData(upload); const button = upload.querySelector('button'); button.disabled = true;
-    fetch(`${apiBase}/client/tracks/${encodeURIComponent(upload.dataset.trackUpload)}/versions`, { method: 'POST', headers: { Authorization: `Bearer ${apiToken}` }, body: form }).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Não foi possível enviar a versão.'); return refreshPortal(); }).catch(error => { button.disabled = false; alert(error.message); });
-    return;
-  }
   const comment = event.target.closest('[data-track-comment]');
   if (comment) {
     event.preventDefault(); const form = new FormData(comment); const button = comment.querySelector('button'); button.disabled = true;
-    apiRequest(`/client/tracks/${encodeURIComponent(comment.dataset.trackComment)}/comments`, { method: 'POST', body: JSON.stringify({ body: form.get('body') }) }).then(refreshPortal).catch(error => { button.disabled = false; alert(error.message); });
+    apiRequest(`/client/tracks/${encodeURIComponent(comment.dataset.trackComment)}/comments`, { method: 'POST', body: JSON.stringify({ body: form.get('body'), versionId: form.get('versionId'), positionSeconds: Number(form.get('positionSeconds') || 0) }) }).then(refreshPortal).catch(error => { button.disabled = false; alert(error.message); });
     return;
   }
   if (event.target.id !== 'artistProfileForm') return;

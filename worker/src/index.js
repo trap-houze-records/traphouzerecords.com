@@ -371,6 +371,7 @@ async function clientTrackRequest(request, env) {
   try { body = await request.json(); } catch { return error('Pedido inválido.'); }
   const title = String(body.title || '').trim().slice(0, 180);
   const category = trackCategory(String(body.category || 'mix-master'));
+  if (category === 'recording') return error('As gravações são adicionadas pela Trap Houze Records.', 403);
   if (!title) return error('Indique o nome da música.');
   const content = (await contentFromGitHub(env)).content;
   const service = category === 'mix-master' ? requestedMixService(content, body.requestedService, true) : null;
@@ -387,9 +388,12 @@ async function clientTrackRequest(request, env) {
 }
 async function clientTrackVersion(request, env, trackId) {
   const session = await clientSession(request, env);
-  if (!session) return error('Inicie sessão para gerir versões.', 401);
+  if (!session) return error('Inicie sessão para enviar o ficheiro inicial.', 401);
   const db = clientDb(env);
   const track = await clientOwnedTrack(db, session.clientId, trackId);
+  if (track.category === 'recording') return error('Os ficheiros das gravações são geridos pela Trap Houze Records.', 403);
+  const existing = await db.prepare('SELECT COUNT(*) AS total FROM client_track_versions WHERE track_id = ?').bind(track.id).first();
+  if (Number(existing?.total || 0) > 0) return error('As versões seguintes são geridas pela Trap Houze Records.', 403);
   const form = await request.formData();
   const version = await createTrackVersion(db, env, track, form.get('file'), form.get('label'), 'client');
   await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'track_version.created').run();
@@ -404,11 +408,12 @@ async function clientTrackComment(request, env, trackId) {
   if (!text) return error('Escreva um comentário.');
   const db = clientDb(env);
   const track = await clientOwnedTrack(db, session.clientId, trackId);
-  const versionId = String(body.versionId || '').trim() || null;
-  if (versionId && !await db.prepare('SELECT id FROM client_track_versions WHERE id = ? AND track_id = ?').bind(versionId, track.id).first()) return error('Versão não encontrada.', 404);
+  const versionId = String(body.versionId || '').trim();
+  if (!versionId || !await db.prepare('SELECT id FROM client_track_versions WHERE id = ? AND track_id = ?').bind(versionId, track.id).first()) return error('Selecione uma versão válida.', 404);
+  const positionSeconds = trackCommentPosition(body.positionSeconds);
   const id = randomId();
-  await db.prepare('INSERT INTO client_track_comments (id, track_id, version_id, author_type, body) VALUES (?, ?, ?, ?, ?)').bind(id, track.id, versionId, 'client', text).run();
-  return jsonResponse({ id, trackId: track.id, versionId, authorType: 'client', body: text }, 201);
+  await db.prepare('INSERT INTO client_track_comments (id, track_id, version_id, author_type, body, position_seconds) VALUES (?, ?, ?, ?, ?, ?)').bind(id, track.id, versionId, 'client', text, positionSeconds).run();
+  return jsonResponse({ id, trackId: track.id, versionId, authorType: 'client', body: text, positionSeconds }, 201);
 }
 async function clientTrackFile(request, env, trackId, versionId) {
   const session = await clientSession(request, env);
@@ -428,6 +433,20 @@ async function adminTrackVersion(request, env, trackId) {
   await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), track.clientId, admin.login, 'track_version.created').run();
   return jsonResponse(version, 201);
 }
+async function adminTrackVersionDelete(request, env, trackId, versionId) {
+  const admin = await requirePortalAdmin(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  const db = clientDb(env);
+  const version = await db.prepare('SELECT v.id, v.storage_key AS storageKey, t.client_id AS clientId FROM client_track_versions v JOIN client_tracks t ON t.id = v.track_id WHERE v.id = ? AND v.track_id = ?').bind(versionId, trackId).first();
+  if (!version) return error('Versão não encontrada.', 404);
+  await db.batch([
+    db.prepare('DELETE FROM client_track_comments WHERE version_id = ?').bind(versionId),
+    db.prepare('DELETE FROM client_track_versions WHERE id = ? AND track_id = ?').bind(versionId, trackId),
+    db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), version.clientId, admin.login, 'track_version.deleted', JSON.stringify({ trackId, versionId }))
+  ]);
+  try { await env.CLIENT_AUDIO?.delete(version.storageKey); } catch (caught) { console.warn('R2: metadados removidos sem apagar o objeto', caught); }
+  return jsonResponse({ id: versionId, deleted: true });
+}
 async function adminTrackComment(request, env, trackId) {
   const admin = await requirePortalAdmin(request, env);
   if (!admin) return error('Pedido de administração não autorizado.', 403);
@@ -438,11 +457,12 @@ async function adminTrackComment(request, env, trackId) {
   const db = clientDb(env);
   const track = await db.prepare('SELECT id, client_id AS clientId FROM client_tracks WHERE id = ?').bind(trackId).first();
   if (!track) return error('Música não encontrada.', 404);
-  const versionId = String(body.versionId || '').trim() || null;
-  if (versionId && !await db.prepare('SELECT id FROM client_track_versions WHERE id = ? AND track_id = ?').bind(versionId, track.id).first()) return error('Versão não encontrada.', 404);
+  const versionId = String(body.versionId || '').trim();
+  if (!versionId || !await db.prepare('SELECT id FROM client_track_versions WHERE id = ? AND track_id = ?').bind(versionId, track.id).first()) return error('Selecione uma versão válida.', 404);
+  const positionSeconds = trackCommentPosition(body.positionSeconds);
   const id = randomId();
-  await db.prepare('INSERT INTO client_track_comments (id, track_id, version_id, author_type, body) VALUES (?, ?, ?, ?, ?)').bind(id, track.id, versionId, 'admin', text).run();
-  return jsonResponse({ id, trackId: track.id, versionId, authorType: 'admin', body: text }, 201);
+  await db.prepare('INSERT INTO client_track_comments (id, track_id, version_id, author_type, body, position_seconds) VALUES (?, ?, ?, ?, ?, ?)').bind(id, track.id, versionId, 'admin', text, positionSeconds).run();
+  return jsonResponse({ id, trackId: track.id, versionId, authorType: 'admin', body: text, positionSeconds }, 201);
 }
 async function adminTrackFile(request, env, trackId, versionId) {
   const admin = await adminSession(request, env);
@@ -596,12 +616,17 @@ function audioExtension(file) {
   const match = String(file.name || '').match(/\.([a-z0-9]{2,5})$/i);
   return match ? match[1].toLowerCase() : ({ 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/flac': 'flac', 'audio/mp4': 'm4a', 'audio/aac': 'aac', 'audio/ogg': 'ogg' }[file.type] || 'audio');
 }
+function trackCommentPosition(value) {
+  const seconds = Math.floor(Number(value || 0));
+  if (!Number.isFinite(seconds) || seconds < 0 || seconds > 24 * 60 * 60) throw inputError('O momento do comentário é inválido.');
+  return seconds;
+}
 async function trackWorkspace(clientId, env) {
   const db = clientDb(env);
   const [tracks, versions, comments] = await db.batch([
     db.prepare("SELECT id, title, stage, category, requested_service AS requestedService, source_track_id AS sourceTrackId, CASE WHEN paid_cents >= amount_cents THEN 'paid' WHEN paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, amount_cents AS amountCents, paid_cents AS paidCents, payment_url AS paymentUrl, samply_url AS samplyUrl, created_at AS createdAt FROM client_tracks WHERE client_id = ? ORDER BY created_at DESC").bind(clientId),
     db.prepare('SELECT v.id, v.track_id AS trackId, v.label, v.original_name AS originalName, v.mime_type AS mimeType, v.size_bytes AS sizeBytes, v.created_by AS createdBy, v.created_at AS createdAt FROM client_track_versions v JOIN client_tracks t ON t.id = v.track_id WHERE t.client_id = ? ORDER BY v.created_at DESC').bind(clientId),
-    db.prepare('SELECT c.id, c.track_id AS trackId, c.version_id AS versionId, c.author_type AS authorType, c.body, c.created_at AS createdAt FROM client_track_comments c JOIN client_tracks t ON t.id = c.track_id WHERE t.client_id = ? ORDER BY c.created_at ASC').bind(clientId)
+    db.prepare('SELECT c.id, c.track_id AS trackId, c.version_id AS versionId, c.author_type AS authorType, c.body, c.position_seconds AS positionSeconds, c.created_at AS createdAt FROM client_track_comments c JOIN client_tracks t ON t.id = c.track_id WHERE t.client_id = ? ORDER BY c.created_at ASC').bind(clientId)
   ]);
   const versionsByTrack = new Map();
   for (const version of versions.results) versionsByTrack.set(version.trackId, [...(versionsByTrack.get(version.trackId) || []), version]);
@@ -1228,6 +1253,7 @@ export default {
       else if (url.pathname === '/dashboard/summary' && request.method === 'GET') response = await dashboardSummary(request, env);
       else if (url.pathname === '/client/admin/clients' && request.method === 'POST') response = await portalCreateClient(request, env);
       else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/versions$/i.test(url.pathname) && request.method === 'POST') response = await adminTrackVersion(request, env, url.pathname.split('/')[4]);
+      else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/versions\/[0-9a-f-]{36}$/i.test(url.pathname) && request.method === 'DELETE') response = await adminTrackVersionDelete(request, env, url.pathname.split('/')[4], url.pathname.split('/')[6]);
       else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/comments$/i.test(url.pathname) && request.method === 'POST') response = await adminTrackComment(request, env, url.pathname.split('/')[4]);
       else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/versions\/[0-9a-f-]{36}\/file$/i.test(url.pathname) && request.method === 'GET') response = await adminTrackFile(request, env, url.pathname.split('/')[4], url.pathname.split('/')[6]);
       else if (/^\/client\/admin\/clients\/[0-9a-f-]{36}$/i.test(url.pathname) && request.method === 'GET') response = await portalAdminClient(request, env, url.pathname.split('/').pop());

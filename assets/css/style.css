@@ -1239,14 +1239,32 @@ footer p {
 .track-comments article { border-bottom: 1px solid rgba(255,255,255,.08); padding: 11px 0; }
 .track-comments article b { color: #16c7f3; font-size: .75rem; }
 .track-comments article p { color: rgba(255,255,255,.7); font-size: .86rem; line-height: 1.45; margin: 5px 0 0; }
+.track-comment-meta { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
+.track-comment-meta button { background: transparent; border: 1px solid rgba(22,199,243,.45); color: #16c7f3; cursor: pointer; font: inherit; font-size: .7rem; padding: 5px 7px; }
+.track-comment-context { color: rgba(255,255,255,.58); font-size: .74rem; grid-column: 1 / -1; margin: 0; }
+.track-comment-context b, .track-comment-context span { color: #16c7f3; }
 .manager-track-workspace { border-top: 1px solid rgba(255,255,255,.1); display: grid; gap: 8px; margin-top: 14px; min-width: 0; padding-top: 13px; }
 .manager-track-workspace > strong { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; }
 .manager-track-workspace small { color: rgba(255,255,255,.58); font-size: .76rem; }
 .manager-track-workspace form { align-items: stretch; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto; min-width: 0; }
-.manager-track-workspace form input { border: 1px solid rgba(255,255,255,.18); background: #111; color: #fff; font: inherit; min-width: 0; padding: 9px 10px; width: 100%; }
+.manager-track-workspace form[data-admin-track-comment] { grid-template-columns: 1fr; }
+.manager-track-workspace form input, .manager-track-workspace form select { border: 1px solid rgba(255,255,255,.18); background: #111; color: #fff; font: inherit; min-width: 0; padding: 9px 10px; width: 100%; }
 .manager-track-workspace form input[type="file"] { grid-column: 1 / -1; max-width: 100%; padding: 6px; }
 .manager-track-workspace form input[type="file"]::file-selector-button { border: 0; background: #242424; color: #fff; cursor: pointer; margin-right: 10px; padding: 7px 9px; }
 .manager-track-workspace form button { background: transparent; border: 1px solid rgba(22,199,243,.65); color: #16c7f3; cursor: pointer; font: inherit; font-size: .76rem; padding: 8px 11px; white-space: nowrap; }
+.manager-track-workspace form > small { grid-column: 1 / -1; }
+.manager-track-workspace audio { height: 36px; margin-top: 3px; width: 100%; }
+.manager-track-version-list { display: grid; }
+.manager-track-version { align-items: center; border-bottom: 1px solid rgba(255,255,255,.08); display: flex; gap: 12px; justify-content: space-between; padding: 9px 0; }
+.manager-track-version > div:first-child { display: grid; gap: 2px; min-width: 0; }
+.manager-track-version b, .manager-track-version small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.manager-track-version > div:last-child { display: flex; gap: 6px; }
+.manager-track-version button, .manager-track-comment button { background: transparent; border: 1px solid rgba(22,199,243,.45); color: #16c7f3; cursor: pointer; font: inherit; font-size: .7rem; padding: 6px 8px; }
+.manager-track-version button.danger { border-color: rgba(255,105,105,.45); color: #ff8585; }
+.manager-track-comment { align-items: start; border-bottom: 1px solid rgba(255,255,255,.08); display: grid; gap: 10px; grid-template-columns: auto minmax(0, 1fr); padding: 9px 0; }
+.manager-track-comment div { min-width: 0; }
+.manager-track-comment b { color: rgba(255,255,255,.82); font-size: .72rem; }
+.manager-track-comment p { color: rgba(255,255,255,.66); font-size: .78rem; line-height: 1.4; margin: 3px 0 0; overflow-wrap: anywhere; }
 .client-simple-help { display: flex; justify-content: space-between; align-items: center; gap: 18px; border: 1px solid rgba(255,255,255,.14); margin-top: 16px; padding: 20px 25px; color: rgba(255,255,255,.62); }
 .client-simple-help a { color: #fff; text-decoration: none; }
 .client-simple-help b { color: #16c7f3; font-size: 1.3rem; margin-left: 12px; }
@@ -1466,6 +1484,11 @@ footer p {
     .track-stages { grid-template-columns: 1fr; }
     .track-upload-form, .track-comment-form { grid-template-columns: 1fr; }
     .manager-track-workspace form { grid-template-columns: 1fr; }
+    .manager-track-version { align-items: flex-start; flex-direction: column; }
+    .manager-track-version > div:last-child { width: 100%; }
+    .manager-track-version > div:last-child button { flex: 1; }
+    .manager-track-comment { grid-template-columns: 1fr; }
+    .manager-track-comment button { justify-self: start; }
     .track-player { gap: 14px; padding: 15px; }
     .track-player-heading { align-items: flex-start; display: grid; grid-template-columns: minmax(0, 1fr); }
     .track-player-identity { grid-template-columns: 40px minmax(0, 1fr); }

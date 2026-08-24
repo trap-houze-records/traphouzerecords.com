@@ -62,9 +62,11 @@ CREATE TABLE client_track_comments (
   version_id TEXT REFERENCES client_track_versions(id) ON DELETE SET NULL,
   author_type TEXT NOT NULL CHECK (author_type IN ('client', 'admin')),
   body TEXT NOT NULL,
+  position_seconds INTEGER NOT NULL DEFAULT 0 CHECK (position_seconds >= 0),
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX client_track_comments_track_id ON client_track_comments(track_id, created_at DESC);
+CREATE INDEX client_track_comments_version_id ON client_track_comments(version_id, position_seconds, created_at);
 
 CREATE TABLE client_bookings (
   id TEXT PRIMARY KEY,
