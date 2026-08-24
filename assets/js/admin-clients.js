@@ -16,6 +16,7 @@ window.ClientAdminModule = (() => {
     let clients = [];
     let portal;
     const revealedPasswords = new Map();
+    const mixServices = options.mixMasterServices || [];
 
     function generatePassword() {
       const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
@@ -48,13 +49,16 @@ window.ClientAdminModule = (() => {
       const label = track ? 'Nome' : 'Serviço';
       const name = track ? 'title' : 'service';
       const payment = paymentMeta(item);
+      const recordingOptions = track ? portal.tracks.filter(candidate => candidate.category === 'recording' && candidate.id !== item.id).map(candidate => `<option value="${escapeHtml(candidate.id)}" ${candidate.id === item.sourceTrackId ? 'selected' : ''}>${escapeHtml(candidate.title)}</option>`).join('') : '';
+      const versions = track ? (item.versions || []) : [];
+      const comments = track ? (item.comments || []) : [];
       return `<article class="manager-record" data-item="${type}" data-id="${item.id}">
         <div class="manager-record-top"><strong>${track ? 'Música' : 'Reserva'}</strong><button type="button" data-delete="${type}" data-id="${item.id}" aria-label="Remover">×</button></div>
         <label class="admin-field"><span>${label}</span><input data-field="${name}" value="${escapeHtml(item[name])}"></label>
-        ${track ? `<label class="admin-field"><span>Fase</span><select data-field="stage">${[['start', 'Iniciar'], ['mix', 'Mix'], ['master', 'Master']].map(([value, text]) => `<option value="${value}" ${item.stage === value ? 'selected' : ''}>${text}</option>`).join('')}</select></label>` : `<label class="admin-field"><span>Data e hora</span><input type="datetime-local" data-field="startsAt" value="${escapeHtml((item.startsAt || '').replace(' ', 'T').slice(0, 16))}"></label>`}
+        ${track ? `<div class="manager-record-grid"><label class="admin-field"><span>Área</span><select data-field="category"><option value="mix-master" ${item.category !== 'recording' ? 'selected' : ''}>Mix & Master</option><option value="recording" ${item.category === 'recording' ? 'selected' : ''}>Gravações</option></select></label><label class="admin-field"><span>Fase</span><select data-field="stage">${[['start', 'Iniciar'], ['mix', 'Mix'], ['master', 'Master']].map(([value, text]) => `<option value="${value}" ${item.stage === value ? 'selected' : ''}>${text}</option>`).join('')}</select></label></div><div class="manager-record-grid"><label class="admin-field"><span>Serviço pedido</span><select data-field="requestedService"><option value="">Sem pedido</option>${mixServices.map(service => `<option value="${escapeHtml(service.id)}" ${item.requestedService === service.id ? 'selected' : ''}>${escapeHtml(service.title)}</option>`).join('')}</select></label><label class="admin-field"><span>Gravação de origem</span><select data-field="sourceTrackId"><option value="">Nenhuma</option>${recordingOptions}</select></label></div>` : `<label class="admin-field"><span>Data e hora</span><input type="datetime-local" data-field="startsAt" value="${escapeHtml((item.startsAt || '').replace(' ', 'T').slice(0, 16))}"></label>`}
         <div class="manager-record-grid"><label class="admin-field"><span>Valor (€)</span><input type="number" step="0.01" min="0" data-field="amount" value="${numericAmount(item.amountCents)}"></label><label class="admin-field"><span>Recebido (€)</span><input type="number" step="0.01" min="0" data-field="paidAmount" value="${payment.paid.toFixed(2)}"></label></div>
        <label class="admin-field"><span>Link de pagamento</span><input type="url" data-field="paymentUrl" value="${escapeHtml(item.paymentUrl || '')}" placeholder="https://"></label>
-        ${track ? `<label class="admin-field"><span>Player Samply</span><textarea rows="3" data-field="samplyUrl" placeholder="<iframe src=&quot;https://samply.app/embed/...&quot; ...></iframe>">${escapeHtml(item.samplyUrl || '')}</textarea><small>Cola aqui o código Embed copiado do Samply. Guardamos automaticamente o link seguro do player.</small></label>` : ''}
+        ${track ? `<label class="admin-field"><span>Player Samply</span><textarea rows="3" data-field="samplyUrl" placeholder="<iframe src=&quot;https://samply.app/embed/...&quot; ...></iframe>">${escapeHtml(item.samplyUrl || '')}</textarea><small>Opcional: player Samply complementar.</small></label><div class="manager-track-workspace"><strong>Versões (${versions.length})</strong>${versions.map(version => `<small>${escapeHtml(version.label)} · ${escapeHtml(version.originalName)}</small>`).join('') || '<small>Sem versões carregadas.</small>'}<form data-admin-track-upload="${escapeHtml(item.id)}"><input name="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/mp4,audio/aac,audio/ogg" required><input name="label" maxlength="120" placeholder="Nome da versão"><button type="submit">Enviar versão</button></form></div><div class="manager-track-workspace"><strong>Comentários (${comments.length})</strong>${comments.map(comment => `<small><b>${comment.authorType === 'admin' ? 'Trap Houze' : 'Artista'}:</b> ${escapeHtml(comment.body)}</small>`).join('') || '<small>Sem comentários.</small>'}<form data-admin-track-comment="${escapeHtml(item.id)}"><input name="body" maxlength="2000" placeholder="Adicionar comentário"><button type="submit">Comentar</button></form></div>` : ''}
        <p class="admin-hint">${payment.label}</p>
        <button type="button" class="manager-copy" data-save-record>Guardar ${track ? 'música' : 'reserva'}</button>
       </article>`;
@@ -103,7 +107,7 @@ window.ClientAdminModule = (() => {
       const base = { amount: Number(field('amount').value || 0), paidAmount: Number(field('paidAmount').value || 0), paymentUrl: field('paymentUrl').value.trim() };
       const samplyValue = track ? field('samplyUrl').value.trim() : '';
       const embedSource = samplyValue.match(/<iframe[^>]+src=['"]([^'"]+)['"]/i)?.[1] || samplyValue;
-      return type === 'tracks' ? { ...base, title: field('title').value.trim(), stage: field('stage').value, samplyUrl: embedSource } : { ...base, service: field('service').value.trim(), startsAt: field('startsAt').value.replace('T', ' ') };
+      return type === 'tracks' ? { ...base, title: field('title').value.trim(), stage: field('stage').value, category: field('category').value, requestedService: field('requestedService').value, sourceTrackId: field('sourceTrackId').value, samplyUrl: embedSource } : { ...base, service: field('service').value.trim(), startsAt: field('startsAt').value.replace('T', ' ') };
     }
     function appointmentPayload(card) {
       const field = name => card.querySelector(`[data-appointment-field="${name}"]`);
@@ -170,6 +174,20 @@ window.ClientAdminModule = (() => {
       if (!event.target.matches('[data-client-field="password"]')) return;
       const copy = root.querySelector('[data-copy-password]');
       if (copy) copy.disabled = !event.target.value;
+    });
+    root.addEventListener('submit', event => {
+      const upload = event.target.closest('[data-admin-track-upload]');
+      if (upload) {
+        event.preventDefault();
+        const button = upload.querySelector('button'); button.disabled = true;
+        return fetch(`${apiBase}/client/admin/tracks/${encodeURIComponent(upload.dataset.adminTrackUpload)}/versions`, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}`, 'X-CMS-CSRF': getCsrf() }, body: new FormData(upload) }).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Não foi possível enviar a versão.'); return refresh(); }).catch(options.onError).finally(() => { button.disabled = false; });
+      }
+      const comment = event.target.closest('[data-admin-track-comment]');
+      if (comment) {
+        event.preventDefault();
+        const button = comment.querySelector('button'); button.disabled = true;
+        return api(`/client/admin/tracks/${encodeURIComponent(comment.dataset.adminTrackComment)}/comments`, { method: 'POST', body: JSON.stringify({ body: new FormData(comment).get('body') }) }).then(() => refresh()).catch(options.onError).finally(() => { button.disabled = false; });
+      }
     });
     return refresh();
   }

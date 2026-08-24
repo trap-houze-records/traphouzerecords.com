@@ -34,11 +34,37 @@ CREATE TABLE client_tracks (
   paid_cents INTEGER NOT NULL DEFAULT 0 CHECK (paid_cents >= 0 AND paid_cents <= amount_cents),
   payment_url TEXT,
   samply_url TEXT,
+  category TEXT NOT NULL DEFAULT 'mix-master' CHECK (category IN ('mix-master', 'recording')),
+  requested_service TEXT,
+  source_track_id TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX client_tracks_client_id ON client_tracks(client_id);
+
+CREATE TABLE client_track_versions (
+  id TEXT PRIMARY KEY,
+  track_id TEXT NOT NULL REFERENCES client_tracks(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  storage_key TEXT NOT NULL,
+  original_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL DEFAULT 0 CHECK (size_bytes >= 0),
+  created_by TEXT NOT NULL CHECK (created_by IN ('client', 'admin')),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX client_track_versions_track_id ON client_track_versions(track_id, created_at DESC);
+
+CREATE TABLE client_track_comments (
+  id TEXT PRIMARY KEY,
+  track_id TEXT NOT NULL REFERENCES client_tracks(id) ON DELETE CASCADE,
+  version_id TEXT REFERENCES client_track_versions(id) ON DELETE SET NULL,
+  author_type TEXT NOT NULL CHECK (author_type IN ('client', 'admin')),
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX client_track_comments_track_id ON client_track_comments(track_id, created_at DESC);
 
 CREATE TABLE client_bookings (
   id TEXT PRIMARY KEY,

@@ -1195,6 +1195,36 @@ footer p {
 .track-samply .eyebrow { margin-bottom: 9px; }
 .track-samply iframe { border: 0; display: block; height: 152px; width: 100%; }
 .track-payment-mark { color: #16c7f3; font-size: 1.2rem; }
+.track-tabs { display: flex; gap: 18px; border-bottom: 1px solid rgba(255,255,255,.14); margin: -2px 0 22px; }
+.track-tabs button { background: transparent; border: 0; border-bottom: 2px solid transparent; color: rgba(255,255,255,.54); cursor: pointer; font: inherit; padding: 0 0 12px; }
+.track-tabs button.active { border-color: #16c7f3; color: #fff; }
+.track-tabs span, .track-workspace-heading span { color: #16c7f3; font-size: .75rem; margin-left: 5px; }
+.track-submission { display: grid; gap: 14px; border: 1px solid rgba(22,199,243,.38); background: #151719; margin: 0 0 22px; padding: 22px; }
+.track-submission h3 { font-size: 1.25rem; margin: 4px 0 0; }
+.track-submission label, .track-upload-form label { color: rgba(255,255,255,.62); display: grid; font-size: .78rem; gap: 7px; }
+.track-submission input, .track-submission select, .track-upload-form input, .track-comment-form textarea { min-width: 0; }
+.track-submission-actions { align-items: center; display: flex; gap: 15px; }
+.track-submission-actions button:first-child, .track-upload-form button, .track-comment-form button { background: #16c7f3; border: 1px solid #16c7f3; color: #071013; cursor: pointer; font: inherit; padding: 9px 13px; }
+.track-audio { align-items: center; border-top: 1px solid rgba(255,255,255,.1); display: flex; gap: 12px; margin-top: 14px; padding-top: 14px; }
+.track-audio audio { flex: 1; height: 36px; max-width: 100%; }
+.track-audio button, .track-version button { background: transparent; border: 1px solid rgba(22,199,243,.6); color: #16c7f3; cursor: pointer; font: inherit; font-size: .75rem; padding: 7px 9px; }
+.track-workspace { border-top: 1px solid rgba(255,255,255,.1); margin-top: 16px; padding-top: 15px; }
+.track-workspace-heading { align-items: baseline; display: flex; justify-content: space-between; text-transform: uppercase; font-size: .76rem; letter-spacing: .08em; }
+.track-version { align-items: center; display: grid; gap: 3px 12px; grid-template-columns: 1fr auto; border-bottom: 1px solid rgba(255,255,255,.08); padding: 10px 0; }
+.track-version.latest > span { color: #16c7f3; }
+.track-version small, .track-empty { color: rgba(255,255,255,.46); font-size: .76rem; }
+.track-version > div { align-items: center; display: flex; gap: 6px; grid-column: 2; grid-row: 1 / span 2; }
+.track-upload-form, .track-comment-form { align-items: end; display: grid; gap: 9px; grid-template-columns: 1fr 1fr auto; margin-top: 13px; }
+.track-comment-form { grid-template-columns: 1fr auto; }
+.track-comment-form textarea { min-height: 42px; }
+.track-comments article { border-bottom: 1px solid rgba(255,255,255,.08); padding: 11px 0; }
+.track-comments article b { color: #16c7f3; font-size: .75rem; }
+.track-comments article p { color: rgba(255,255,255,.7); font-size: .86rem; line-height: 1.45; margin: 5px 0 0; }
+.manager-track-workspace { border-top: 1px solid rgba(255,255,255,.1); display: grid; gap: 8px; margin-top: 14px; padding-top: 13px; }
+.manager-track-workspace > strong { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; }
+.manager-track-workspace small { color: rgba(255,255,255,.58); font-size: .76rem; }
+.manager-track-workspace form { display: grid; gap: 8px; grid-template-columns: 1fr 1fr auto; }
+.manager-track-workspace form button { background: transparent; border: 1px solid rgba(22,199,243,.65); color: #16c7f3; cursor: pointer; font: inherit; font-size: .76rem; padding: 8px; }
 .client-simple-help { display: flex; justify-content: space-between; align-items: center; gap: 18px; border: 1px solid rgba(255,255,255,.14); margin-top: 16px; padding: 20px 25px; color: rgba(255,255,255,.62); }
 .client-simple-help a { color: #fff; text-decoration: none; }
 .client-simple-help b { color: #16c7f3; font-size: 1.3rem; margin-left: 12px; }
@@ -1410,6 +1440,10 @@ footer p {
     .client-simple-hero { padding: 48px 0 32px; }
     .track-card { padding: 20px; }
     .track-stages { grid-template-columns: 1fr; }
+    .track-upload-form, .track-comment-form { grid-template-columns: 1fr; }
+    .manager-track-workspace form { grid-template-columns: 1fr; }
+    .track-audio { align-items: stretch; flex-direction: column; }
+    .track-audio button { align-self: flex-start; }
     .client-simple-help { align-items: flex-start; flex-direction: column; }
     .client-artist-profile-body, .client-artist-form > div { grid-template-columns: 1fr; }
     .client-artist-photo { max-width: 250px; }

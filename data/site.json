@@ -116,6 +116,11 @@
       "active": true
     }
   ],
+  "mixMasterServices": [
+    { "id": "mix", "title": "Mix", "price": 50, "active": true },
+    { "id": "master", "title": "Master", "price": 30, "active": true },
+    { "id": "mix-master", "title": "Mix & Master", "price": 70, "active": true }
+  ],
   "equipment": [
     {
       "id": "midi",

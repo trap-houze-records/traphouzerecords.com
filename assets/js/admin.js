@@ -52,6 +52,11 @@ const bookingServiceDefaults = [
   { id: 'studio-art-direction', title: 'Sessão de Estúdio (Captação com engenheiro + Direção Artística)', pricePerHour: 30, active: true },
   { id: 'studio-rental', title: 'Alugar o Estúdio', pricePerHour: 10, active: true }
 ];
+const mixMasterServiceDefaults = [
+  { id: 'mix', title: 'Mix', price: 50, active: true },
+  { id: 'master', title: 'Master', price: 30, active: true },
+  { id: 'mix-master', title: 'Mix & Master', price: 70, active: true }
+];
 function renderSite() { const site = draft.site; return `<section class="admin-grid">${card('Dados gerais', [field('Nome', 'site.name', site.name), field('Subtítulo', 'site.tagline', site.tagline), field('Localização', 'site.location', site.location), field('E-mail', 'site.email', site.email), field('URL Instagram', 'site.instagram', site.instagram), field('Nome no Instagram', 'site.instagramHandle', site.instagramHandle), field('WhatsApp (só algarismos)', 'site.whatsapp', site.whatsapp), field('URL de agendamento', 'site.bookingUrl', site.bookingUrl), field('Horário', 'site.hours', site.hours)].join(''))}</section>`; }
 function renderMenu() { return `<section>${card('Navegação', '<p class="admin-hint">Desative uma secção para escondê-la do menu e do site.</p>' + draft.navigation.map((item, index) => `<div class="admin-row">${field('Nome', `navigation.${index}.label`, item.label)}${field('ID', `navigation.${index}.id`, item.id)}${checkbox('Visível', `navigation.${index}.visible`, item.visible)}</div>`).join(''))}</section>`; }
 function renderHero() { return `<section>${listCards('hero', (item, index) => card(`Destaque ${index + 1}`, `${field('Título', `hero.${index}.title`, item.title)}${field('Subtítulo', `hero.${index}.subtitle`, item.subtitle)}${field('Imagem (URL)', `hero.${index}.image`, item.image)}`, `<button class="admin-icon" data-remove="hero" data-index="${index}" aria-label="Remover">×</button>`), 'Adicionar destaque')}</section>`; }
@@ -83,6 +88,7 @@ async function loadContent() {
   if (!response.ok) throw new Error('Não foi possível carregar o conteúdo.');
   draft = await response.json();
   draft.bookingServices = Array.isArray(draft.bookingServices) && draft.bookingServices.length ? draft.bookingServices : bookingServiceDefaults.map(service => ({ ...service }));
+  draft.mixMasterServices = Array.isArray(draft.mixMasterServices) && draft.mixMasterServices.length ? draft.mixMasterServices : mixMasterServiceDefaults.map(service => ({ ...service }));
   draft.artists = (draft.artists || []).map(artist => ({
     ...artist,
     instagram: artistPlatformUrl(artist, 'instagram', 'Instagram'),
@@ -147,7 +153,7 @@ function renderClients() {
   $('#adminTabs').hidden = true;
   $('#publishButton').hidden = true;
   $('#adminContent').innerHTML = '<div id="clientModuleRoot"></div>';
-  window.ClientAdminModule.mount($('#clientModuleRoot'), { apiBase, getToken: () => sessionToken, getCsrf: () => csrfToken, onError: error => notice(error.message, 'error'), onNotice: notice }).catch(error => notice(error.message, 'error'));
+  window.ClientAdminModule.mount($('#clientModuleRoot'), { apiBase, getToken: () => sessionToken, getCsrf: () => csrfToken, mixMasterServices: draft?.mixMasterServices || mixMasterServiceDefaults, onError: error => notice(error.message, 'error'), onNotice: notice }).catch(error => notice(error.message, 'error'));
 }
 function renderSchedule() {
   $('#adminTabs').hidden = true;
@@ -177,9 +183,10 @@ function renderFinance() {
   $('#adminTabs').hidden = true;
   $('#publishButton').hidden = true;
   $('#adminContent').innerHTML = '<div id="financeModuleRoot"></div>';
-  window.FinanceModule.mount($('#financeModuleRoot'), { apiBase, getToken: () => sessionToken, bookingServices: draft?.bookingServices || bookingServiceDefaults, saveBookingServices: async services => {
+  window.FinanceModule.mount($('#financeModuleRoot'), { apiBase, getToken: () => sessionToken, bookingServices: draft?.bookingServices || bookingServiceDefaults, mixMasterServices: draft?.mixMasterServices || mixMasterServiceDefaults, saveServices: async (services, mixServices) => {
     if (!draft) { const response = await fetch(`${apiBase}/content`, { cache: 'no-store' }); if (!response.ok) throw new Error('Não foi possível carregar a configuração de preços.'); draft = await response.json(); }
     draft.bookingServices = services;
+    draft.mixMasterServices = mixServices;
     const response = await fetch(`${apiBase}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CMS-CSRF': csrfToken, Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ content: draft }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Não foi possível guardar os preços.');

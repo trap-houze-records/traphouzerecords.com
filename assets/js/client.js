@@ -11,6 +11,8 @@ const defaultClientData = {
   ]
 };
 let clientData = defaultClientData;
+let musicTab = 'mix-master';
+let submittingTrack = false;
 const apiBase = (window.CLIENT_PORTAL_API_URL || window.CMS_API_URL || '').replace(/\/$/, '');
 const usesLocalPortalApi = /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(apiBase);
 const clientTokenKey = 'th_client_portal_token';
@@ -38,7 +40,8 @@ function normalisePortal(data) {
   return {
     client: data.client.name,
     artistProfile: data.artistProfile || null,
-    tracks: (data.tracks || []).map(item => ({ title: item.title, stage: item.stage, ...paymentFields(item), paymentUrl: item.paymentUrl || '', samplyUrl: item.samplyUrl || '' })),
+    tracks: (data.tracks || []).map(item => ({ id: item.id, title: item.title, stage: item.stage, category: item.category || 'mix-master', requestedService: item.requestedService || '', sourceTrackId: item.sourceTrackId || '', versions: item.versions || [], comments: item.comments || [], ...paymentFields(item), paymentUrl: item.paymentUrl || '', samplyUrl: item.samplyUrl || '' })),
+    mixMasterServices: (data.mixMasterServices || []).filter(item => item.active !== false),
     bookings: [...appointments, ...(data.bookings || []).filter(item => !linkedAppointments.has(item.appointmentId)).map(item => ({ id: item.id, date: item.startsAt || 'A confirmar', time: '', service: item.service, ...paymentFields(item), paymentUrl: item.paymentUrl || '' }))]
   };
 }
@@ -54,22 +57,32 @@ async function apiRequest(path, options = {}) {
   return body;
 }
 
+function trackServiceLabel(track) {
+  return track.category === 'recording' ? 'Gravação' : ({ mix: 'Mix', master: 'Master', 'mix-master': 'Mix & Master' }[track.requestedService] || 'Em produção');
+}
+function versionFileSize(size) { return Number(size || 0) >= 1024 * 1024 ? `${(Number(size) / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(Number(size || 0) / 1024))} KB`; }
 function renderTrack(track) {
   const samplyUrl = String(track.samplyUrl || '');
   const samplyPlayer = /^https:\/\/(?:www\.)?samply\.app\/embed\/[A-Za-z0-9_-]+\/?(?:\?.*)?$/i.test(samplyUrl)
     ? `<div class="track-samply"><p class="eyebrow">Ouvir no Samply</p><iframe src="${escapeHtml(samplyUrl)}" title="Player Samply: ${escapeHtml(track.title)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media"></iframe></div>`
     : '';
+  const versions = track.versions || [];
+  const comments = track.comments || [];
+  const latest = versions[0];
+  const audio = latest ? `<div class="track-audio"><audio controls preload="none" data-track-audio="${escapeHtml(track.id)}" data-version-audio="${escapeHtml(latest.id)}"></audio><button type="button" data-download-version="${escapeHtml(latest.id)}" data-track-id="${escapeHtml(track.id)}">Download</button></div>` : '';
+  const stagesPanel = track.category === 'recording' ? '' : `<div class="track-stages" aria-label="Estado do trabalho">${stages.map(([id, label], index) => {
+    const activeIndex = stages.findIndex(([stage]) => stage === String(track.stage).toLowerCase());
+    const state = index < activeIndex ? 'complete' : index === activeIndex ? 'current' : '';
+    return `<div class="track-stage ${state}"><span>${index + 1}</span><strong>${label}</strong></div>`;
+  }).join('')}</div>`;
+  const versionsPanel = `<div class="track-workspace"><div class="track-workspace-heading"><strong>Versões</strong><span>${versions.length}</span></div>${versions.length ? versions.map((version, index) => `<div class="track-version ${index === 0 ? 'latest' : ''}"><span>${escapeHtml(version.label)}</span><small>${escapeHtml(version.originalName)} · ${versionFileSize(version.sizeBytes)}</small><div><button type="button" data-play-version="${escapeHtml(version.id)}" data-track-id="${escapeHtml(track.id)}">Ouvir</button><button type="button" data-download-version="${escapeHtml(version.id)}" data-track-id="${escapeHtml(track.id)}">Descarregar</button></div></div>`).join('') : '<p class="track-empty">Ainda não foi carregada nenhuma versão.</p>'}<form class="track-upload-form" data-track-upload="${escapeHtml(track.id)}"><label>Adicionar versão<input name="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/mp4,audio/aac,audio/ogg" required></label><input name="label" maxlength="120" placeholder="Ex.: V2 · revisão"><button type="submit">Enviar</button></form></div>`;
+  const commentsPanel = `<div class="track-workspace track-comments"><div class="track-workspace-heading"><strong>Comentários</strong><span>${comments.length}</span></div>${comments.length ? comments.map(comment => `<article><b>${comment.authorType === 'admin' ? 'Trap Houze' : 'Tu'}</b><p>${escapeHtml(comment.body)}</p></article>`).join('') : '<p class="track-empty">Sem comentários por agora.</p>'}<form class="track-comment-form" data-track-comment="${escapeHtml(track.id)}"><textarea name="body" rows="2" maxlength="2000" placeholder="Deixa uma nota sobre esta música ou versão"></textarea><button type="submit">Comentar</button></form></div>`;
   return `<article class="track-card">
-    <div class="track-heading"><p class="eyebrow">Música</p><h2>${escapeHtml(track.title)}</h2></div>
-    <div class="track-stages" aria-label="Estado do trabalho">
-      ${stages.map(([id, label], index) => {
-        const activeIndex = stages.findIndex(([stage]) => stage === String(track.stage).toLowerCase());
-        const state = index < activeIndex ? 'complete' : index === activeIndex ? 'current' : '';
-        return `<div class="track-stage ${state}"><span>${index + 1}</span><strong>${label}</strong></div>`;
-      }).join('')}
-    </div>
-    ${samplyPlayer}
-    <div class="track-payment ${track.paymentStatus}"><span>${paymentLabel(track)}</span>${track.due === 0 ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.due)}</button>`}</div>
+    <div class="track-heading"><p class="eyebrow">${trackServiceLabel(track)}</p><h2>${escapeHtml(track.title)}</h2></div>
+    ${stagesPanel}
+    ${audio}${samplyPlayer}
+    ${track.category === 'recording' ? '' : `<div class="track-payment ${track.paymentStatus}"><span>${paymentLabel(track)}</span>${track.due === 0 ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.due)}</button>`}</div>`}
+    ${versionsPanel}${commentsPanel}
   </article>`;
 }
 
@@ -111,16 +124,37 @@ function renderPortal() {
 const outstanding = [...clientData.tracks, ...clientData.bookings].reduce((total, item) => total + Number(item.due || 0), 0);
 const portalNote = apiBase ? 'Área privada · acesso protegido por credenciais.' : 'Protótipo local · o acesso real de cada cliente será ligado numa fase seguinte.';
 const bookings = splitBookings(clientData.bookings);
+const musicTracks = clientData.tracks.filter(track => (track.category || 'mix-master') === musicTab);
+const recordings = clientData.tracks.filter(track => track.category === 'recording');
+const serviceOptions = (clientData.mixMasterServices || []).map(service => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.title)} · ${money(service.price)}</option>`).join('');
+const submitPanel = submittingTrack ? `<form id="trackSubmissionForm" class="track-submission"><div><p class="eyebrow">Novo pedido</p><h3>${musicTab === 'recording' ? 'Enviar gravação' : 'Pedir Mix & Master'}</h3></div><label>Nome da música<input name="title" maxlength="180" required></label>${musicTab === 'mix-master' ? `<label>Serviço<select name="requestedService" required>${serviceOptions}</select></label><label>Usar uma gravação existente<select name="sourceTrackId"><option value="">Enviar novo ficheiro</option>${recordings.map(track => `<option value="${escapeHtml(track.id)}">${escapeHtml(track.title)}</option>`).join('')}</select></label>` : ''}<label>Ficheiro de áudio${musicTab === 'recording' ? '<input name="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/mp4,audio/aac,audio/ogg" required>' : '<input name="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/mp4,audio/aac,audio/ogg">'}</label><div class="track-submission-actions"><button type="submit">Submeter <span>→</span></button><button type="button" class="client-link" data-close-track-submit>Cancelar</button></div></form>` : '';
 portal.innerHTML = `<div class="client-shell client-simple">
-  <header class="client-header"><a class="client-brand" href="/" aria-label="Trap Houze Records"><img src="/images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div class="client-user"><span>Olá, ${escapeHtml(clientData.client)}</span>${apiBase ? '<a class="client-book-session" href="/booking.html">Agendar sessão</a>' : ''}<button class="client-signout" type="button">Sair</button></div></header>
+  <header class="client-header"><a class="client-brand" href="/" aria-label="Trap Houze Records"><img src="/images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div class="client-user"><span>Olá, ${escapeHtml(clientData.client)}</span>${apiBase ? '<a class="client-book-session" href="/booking.html">Agendar sessão</a><button class="client-book-session" type="button" data-open-track-submit>Mix & Master</button>' : ''}<button class="client-signout" type="button">Sair</button></div></header>
   <section class="client-simple-hero"><p class="eyebrow">O teu trabalho</p><h1>A tua agenda</h1><p>Reservas, músicas e pagamentos num só lugar.</p>${outstanding ? `<div class="client-total-due"><span>Total em falta</span><strong>${money(outstanding)}</strong></div>` : ''}</section>
   <section class="booking-section booking-section-upcoming"><div class="booking-section-heading"><div><p class="eyebrow">Próximas sessões</p><h2>Reservas futuras</h2></div><span>${bookings.upcoming.length} agendadas</span></div><div class="booking-list">${bookings.upcoming.map(renderBooking).join('') || '<p class="client-empty">Ainda não tens reservas futuras.</p>'}</div></section>
-  <section class="track-section"><div class="booking-section-heading"><div><p class="eyebrow">Música</p><h2>As tuas músicas</h2></div><span>${clientData.tracks.length} registadas</span></div><div class="track-list">${clientData.tracks.map(renderTrack).join('') || '<p class="client-empty">Ainda não tens músicas registadas.</p>'}</div></section>
+  <section class="track-section"><div class="booking-section-heading"><div><p class="eyebrow">Música</p><h2>As tuas faixas</h2></div><button type="button" class="client-book-session" data-open-track-submit>${musicTab === 'recording' ? '+ Gravação' : '+ Mix & Master'}</button></div><div class="track-tabs" role="tablist"><button type="button" class="${musicTab === 'mix-master' ? 'active' : ''}" data-music-tab="mix-master">Mix & Master <span>${clientData.tracks.filter(track => (track.category || 'mix-master') === 'mix-master').length}</span></button><button type="button" class="${musicTab === 'recording' ? 'active' : ''}" data-music-tab="recording">Gravações <span>${recordings.length}</span></button></div>${submitPanel}<div class="track-list">${musicTracks.map(renderTrack).join('') || `<p class="client-empty">${musicTab === 'recording' ? 'Ainda não tens gravações guardadas.' : 'Ainda não tens músicas em Mix & Master.'}</p>`}</div></section>
   <section class="booking-section booking-section-history"><div class="booking-section-heading"><div><p class="eyebrow">Histórico</p><h2>Reservas anteriores</h2></div><span>${bookings.history.length} concluídas</span></div><div class="booking-list">${bookings.history.map(renderBooking).join('') || '<p class="client-empty">Ainda não existem reservas anteriores.</p>'}</div></section>
   ${renderArtistProfile(clientData.artistProfile)}
   <aside class="client-simple-help"><span>Precisas de ajuda?</span><a href="https://wa.me/351910734914" target="_blank" rel="noopener">Abrir WhatsApp <b>→</b></a></aside>
   <p class="client-demo">${portalNote}</p>
 </div>`;
+  if (apiBase && apiToken) hydrateTrackPlayers();
+}
+
+async function refreshPortal() {
+  const result = await apiRequest('/client/portal');
+  clientData = normalisePortal(result);
+  renderPortal();
+}
+async function trackBlob(trackId, versionId) {
+  const response = await fetch(`${apiBase}/client/tracks/${encodeURIComponent(trackId)}/versions/${encodeURIComponent(versionId)}/file`, { headers: { Authorization: `Bearer ${apiToken}` } });
+  if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(result.error || 'Não foi possível obter este ficheiro.'); }
+  return { blob: await response.blob(), type: response.headers.get('content-type') || 'audio/mpeg' };
+}
+function hydrateTrackPlayers() {
+  document.querySelectorAll('[data-track-audio]').forEach(async audio => {
+    try { const file = await trackBlob(audio.dataset.trackAudio, audio.dataset.versionAudio); audio.src = URL.createObjectURL(file.blob); } catch { audio.closest('.track-audio')?.remove(); }
+  });
 }
 
 function renderLogin(message = '') {
@@ -154,6 +188,25 @@ function renderLogin(message = '') {
 }
 
 document.addEventListener('click', event => {
+  const tab = event.target.closest('[data-music-tab]');
+  if (tab) { musicTab = tab.dataset.musicTab; submittingTrack = false; renderPortal(); return; }
+  if (event.target.closest('[data-open-track-submit]')) { submittingTrack = true; renderPortal(); return; }
+  if (event.target.closest('[data-close-track-submit]')) { submittingTrack = false; renderPortal(); return; }
+  const play = event.target.closest('[data-play-version]');
+  if (play) {
+    const audio = play.closest('.track-card')?.querySelector('[data-track-audio]');
+    if (!audio) return;
+    play.disabled = true;
+    trackBlob(play.dataset.trackId, play.dataset.playVersion).then(file => { audio.src = URL.createObjectURL(file.blob); audio.play().catch(() => {}); }).catch(error => alert(error.message)).finally(() => { play.disabled = false; });
+    return;
+  }
+  const download = event.target.closest('[data-download-version]');
+  if (download) {
+    trackBlob(download.dataset.trackId, download.dataset.downloadVersion).then(file => {
+      const url = URL.createObjectURL(file.blob); const link = document.createElement('a'); link.href = url; link.download = ''; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }).catch(error => alert(error.message));
+    return;
+  }
   const payment = event.target.closest('[data-payment-url]');
   if (payment) {
     const url = payment.dataset.paymentUrl;
@@ -175,6 +228,35 @@ document.addEventListener('click', event => {
 });
 
 document.addEventListener('submit', event => {
+  if (event.target.id === 'trackSubmissionForm') {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    const button = event.target.querySelector('button[type="submit"]');
+    button.disabled = true;
+    const category = musicTab;
+    apiRequest('/client/tracks', { method: 'POST', body: JSON.stringify({ title: form.get('title'), category, requestedService: form.get('requestedService'), sourceTrackId: form.get('sourceTrackId') }) }).then(async track => {
+      const file = form.get('file');
+      if (file instanceof File && file.size) {
+        const upload = new FormData(); upload.append('file', file); upload.append('label', 'Versão inicial');
+        const response = await fetch(`${apiBase}/client/tracks/${encodeURIComponent(track.id)}/versions`, { method: 'POST', headers: { Authorization: `Bearer ${apiToken}` }, body: upload });
+        const result = await response.json(); if (!response.ok) throw new Error(result.error || 'O pedido foi criado, mas o áudio não foi enviado.');
+      }
+      submittingTrack = false; return refreshPortal();
+    }).catch(error => { button.disabled = false; alert(error.message); });
+    return;
+  }
+  const upload = event.target.closest('[data-track-upload]');
+  if (upload) {
+    event.preventDefault(); const form = new FormData(upload); const button = upload.querySelector('button'); button.disabled = true;
+    fetch(`${apiBase}/client/tracks/${encodeURIComponent(upload.dataset.trackUpload)}/versions`, { method: 'POST', headers: { Authorization: `Bearer ${apiToken}` }, body: form }).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Não foi possível enviar a versão.'); return refreshPortal(); }).catch(error => { button.disabled = false; alert(error.message); });
+    return;
+  }
+  const comment = event.target.closest('[data-track-comment]');
+  if (comment) {
+    event.preventDefault(); const form = new FormData(comment); const button = comment.querySelector('button'); button.disabled = true;
+    apiRequest(`/client/tracks/${encodeURIComponent(comment.dataset.trackComment)}/comments`, { method: 'POST', body: JSON.stringify({ body: form.get('body') }) }).then(refreshPortal).catch(error => { button.disabled = false; alert(error.message); });
+    return;
+  }
   if (event.target.id !== 'artistProfileForm') return;
   event.preventDefault();
   const form = new FormData(event.target);

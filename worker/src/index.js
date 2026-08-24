@@ -111,6 +111,11 @@ const defaultBookingServices = [
   { id: 'studio-art-direction', title: 'Sessão de Estúdio (Captação com engenheiro + Direção Artística)', pricePerHour: 30, active: true },
   { id: 'studio-rental', title: 'Alugar o Estúdio', pricePerHour: 10, active: true }
 ];
+const defaultMixMasterServices = [
+  { id: 'mix', title: 'Mix', price: 50, active: true },
+  { id: 'master', title: 'Master', price: 30, active: true },
+  { id: 'mix-master', title: 'Mix & Master', price: 70, active: true }
+];
 const defaultBookingAvailability = { startsAt: '10:00', endsAt: '22:00', lunchStartsAt: '13:00', lunchEndsAt: '14:00', lunchEnabled: true, minNoticeHours: 24 };
 function bookingScheduleFromContent(content) {
   const raw = content?.bookingSchedule && typeof content.bookingSchedule === 'object' ? content.bookingSchedule : {};
@@ -325,12 +330,13 @@ async function portalData(clientId, env) {
   const client = await db.prepare('SELECT id, display_name AS name, username, email, phone, active FROM clients WHERE id = ?').bind(clientId).first();
   if (!client) return null;
   const artistProfile = await artistProfileForClient(clientId, env);
-  const [tracks, bookings, appointments] = await db.batch([
-    db.prepare("SELECT id, title, stage, CASE WHEN paid_cents >= amount_cents THEN 'paid' WHEN paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, amount_cents AS amountCents, paid_cents AS paidCents, payment_url AS paymentUrl, samply_url AS samplyUrl FROM client_tracks WHERE client_id = ? ORDER BY created_at DESC").bind(clientId),
-    db.prepare("SELECT id, appointment_id AS appointmentId, service, starts_at AS startsAt, CASE WHEN paid_cents >= amount_cents THEN 'paid' WHEN paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, amount_cents AS amountCents, paid_cents AS paidCents, payment_url AS paymentUrl FROM client_bookings WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId),
-    db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, CASE WHEN paid_cents >= amount_cents THEN 'paid' WHEN paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, amount_cents AS amountCents, paid_cents AS paidCents, payment_url AS paymentUrl FROM studio_appointments WHERE client_id = ? AND status != 'cancelled' ORDER BY starts_at DESC").bind(clientId)
+  const [tracks, bookings, appointments, content] = await Promise.all([
+    trackWorkspace(clientId, env),
+    db.prepare("SELECT id, appointment_id AS appointmentId, service, starts_at AS startsAt, CASE WHEN paid_cents >= amount_cents THEN 'paid' WHEN paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, amount_cents AS amountCents, paid_cents AS paidCents, payment_url AS paymentUrl FROM client_bookings WHERE client_id = ? ORDER BY starts_at DESC").bind(clientId).all(),
+    db.prepare("SELECT id, client_id AS clientId, service, starts_at AS startsAt, ends_at AS endsAt, status, notes, CASE WHEN paid_cents >= amount_cents THEN 'paid' WHEN paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, amount_cents AS amountCents, paid_cents AS paidCents, payment_url AS paymentUrl FROM studio_appointments WHERE client_id = ? AND status != 'cancelled' ORDER BY starts_at DESC").bind(clientId).all(),
+    contentFromGitHub(env)
   ]);
-  return { client, tracks: tracks.results, bookings: bookings.results, appointments: appointments.results, artistProfile };
+  return { client, tracks, bookings: bookings.results, appointments: appointments.results, artistProfile, mixMasterServices: mixMasterServicesFromContent(content.content) };
 }
 async function clientLogin(request, env) {
   let body;
@@ -357,6 +363,91 @@ async function clientPortal(request, env) {
   if (!session) return error('Inicie sessão para ver a sua área.', 401);
   const portal = await portalData(session.clientId, env);
   return portal?.client.active ? jsonResponse(portal) : error('A conta não está ativa.', 403);
+}
+async function clientTrackRequest(request, env) {
+  const session = await clientSession(request, env);
+  if (!session) return error('Inicie sessão para enviar uma música.', 401);
+  let body;
+  try { body = await request.json(); } catch { return error('Pedido inválido.'); }
+  const title = String(body.title || '').trim().slice(0, 180);
+  const category = trackCategory(String(body.category || 'mix-master'));
+  if (!title) return error('Indique o nome da música.');
+  const content = (await contentFromGitHub(env)).content;
+  const service = category === 'mix-master' ? requestedMixService(content, body.requestedService, true) : null;
+  const sourceTrackId = String(body.sourceTrackId || '').trim() || null;
+  const db = clientDb(env);
+  if (sourceTrackId) {
+    const source = await clientOwnedTrack(db, session.clientId, sourceTrackId);
+    if (source.category !== 'recording') return error('A origem tem de ser uma gravação tua.', 400);
+  }
+  const id = randomId();
+  await db.prepare('INSERT INTO client_tracks (id, client_id, title, stage, category, requested_service, source_track_id, payment_status, amount_cents, paid_cents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)').bind(id, session.clientId, title, 'start', category, service?.id || null, sourceTrackId, 'pending', Math.round((service?.price || 0) * 100)).run();
+  await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'tracks.submitted', JSON.stringify({ id, category, requestedService: service?.id || null })).run();
+  return jsonResponse({ id, title, category, requestedService: service?.id || null }, 201);
+}
+async function clientTrackVersion(request, env, trackId) {
+  const session = await clientSession(request, env);
+  if (!session) return error('Inicie sessão para gerir versões.', 401);
+  const db = clientDb(env);
+  const track = await clientOwnedTrack(db, session.clientId, trackId);
+  const form = await request.formData();
+  const version = await createTrackVersion(db, env, track, form.get('file'), form.get('label'), 'client');
+  await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'track_version.created').run();
+  return jsonResponse(version, 201);
+}
+async function clientTrackComment(request, env, trackId) {
+  const session = await clientSession(request, env);
+  if (!session) return error('Inicie sessão para comentar.', 401);
+  let body;
+  try { body = await request.json(); } catch { return error('Pedido inválido.'); }
+  const text = String(body.body || '').trim().slice(0, 2000);
+  if (!text) return error('Escreva um comentário.');
+  const db = clientDb(env);
+  const track = await clientOwnedTrack(db, session.clientId, trackId);
+  const versionId = String(body.versionId || '').trim() || null;
+  if (versionId && !await db.prepare('SELECT id FROM client_track_versions WHERE id = ? AND track_id = ?').bind(versionId, track.id).first()) return error('Versão não encontrada.', 404);
+  const id = randomId();
+  await db.prepare('INSERT INTO client_track_comments (id, track_id, version_id, author_type, body) VALUES (?, ?, ?, ?, ?)').bind(id, track.id, versionId, 'client', text).run();
+  return jsonResponse({ id, trackId: track.id, versionId, authorType: 'client', body: text }, 201);
+}
+async function clientTrackFile(request, env, trackId, versionId) {
+  const session = await clientSession(request, env);
+  if (!session) return error('Inicie sessão para descarregar ficheiros.', 401);
+  const db = clientDb(env);
+  await clientOwnedTrack(db, session.clientId, trackId);
+  return trackFileResponse(env, db, trackId, versionId);
+}
+async function adminTrackVersion(request, env, trackId) {
+  const admin = await requirePortalAdmin(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  const db = clientDb(env);
+  const track = await db.prepare('SELECT id, client_id AS clientId, title, category FROM client_tracks WHERE id = ?').bind(trackId).first();
+  if (!track) return error('Música não encontrada.', 404);
+  const form = await request.formData();
+  const version = await createTrackVersion(db, env, track, form.get('file'), form.get('label'), 'admin');
+  await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), track.clientId, admin.login, 'track_version.created').run();
+  return jsonResponse(version, 201);
+}
+async function adminTrackComment(request, env, trackId) {
+  const admin = await requirePortalAdmin(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  let body;
+  try { body = await request.json(); } catch { return error('Pedido inválido.'); }
+  const text = String(body.body || '').trim().slice(0, 2000);
+  if (!text) return error('Escreva um comentário.');
+  const db = clientDb(env);
+  const track = await db.prepare('SELECT id, client_id AS clientId FROM client_tracks WHERE id = ?').bind(trackId).first();
+  if (!track) return error('Música não encontrada.', 404);
+  const versionId = String(body.versionId || '').trim() || null;
+  if (versionId && !await db.prepare('SELECT id FROM client_track_versions WHERE id = ? AND track_id = ?').bind(versionId, track.id).first()) return error('Versão não encontrada.', 404);
+  const id = randomId();
+  await db.prepare('INSERT INTO client_track_comments (id, track_id, version_id, author_type, body) VALUES (?, ?, ?, ?, ?)').bind(id, track.id, versionId, 'admin', text).run();
+  return jsonResponse({ id, trackId: track.id, versionId, authorType: 'admin', body: text }, 201);
+}
+async function adminTrackFile(request, env, trackId, versionId) {
+  const admin = await adminSession(request, env);
+  if (!admin) return error('Pedido de administração não autorizado.', 403);
+  return trackFileResponse(env, clientDb(env), trackId, versionId);
 }
 async function clientAppointment(request, env, appointmentId) {
   const session = await clientSession(request, env);
@@ -453,6 +544,10 @@ function paymentStatus(value) {
   if (!['pending', 'paid'].includes(value)) throw inputError('Estado de pagamento inválido.');
   return value;
 }
+function mixMasterServicesFromContent(content) {
+  const source = Array.isArray(content?.mixMasterServices) && content.mixMasterServices.length ? content.mixMasterServices : defaultMixMasterServices;
+  return source.map((item, index) => ({ id: String(item.id || `mix-service-${index + 1}`), title: String(item.title || '').trim(), price: Math.max(0, Number(item.price || 0)), active: item.active !== false })).filter(item => item.title);
+}
 function paymentDetails(amount, paidAmount, legacyStatus = 'pending') {
   const amountCents = cents(amount || 0);
   const hasPaidAmount = paidAmount !== undefined && paidAmount !== null && String(paidAmount).trim() !== '';
@@ -479,6 +574,61 @@ function samplyPlayerUrl(value) {
     if (url.protocol !== 'https:' || !['samply.app', 'www.samply.app'].includes(url.hostname) || !/^\/embed\/[A-Za-z0-9_-]+\/?$/.test(url.pathname)) throw new Error();
     return url.toString();
   } catch { throw inputError('Use o link de embed do Samply (https://samply.app/embed/…).'); }
+}
+function trackCategory(value) {
+  if (!['mix-master', 'recording'].includes(value)) throw inputError('Tipo de música inválido.');
+  return value;
+}
+function requestedMixService(content, value, required = false) {
+  const id = String(value || '').trim();
+  if (!id && !required) return null;
+  const service = mixMasterServicesFromContent(content).find(item => item.id === id && item.active);
+  if (!service) throw inputError('Selecione um serviço de Mix & Master disponível.');
+  return service;
+}
+function safeAudioFile(file) {
+  const allowed = new Set(['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/flac', 'audio/mp4', 'audio/aac', 'audio/ogg']);
+  if (!(file instanceof File) || (!allowed.has(file.type) && !/\.(mp3|wav|flac|m4a|aac|ogg)$/i.test(file.name || ''))) throw inputError('Envie um ficheiro de áudio MP3, WAV, FLAC, M4A, AAC ou OGG.');
+  if (file.size < 1 || file.size > 100 * 1024 * 1024) throw inputError('O áudio deve ter no máximo 100 MB.');
+  return file;
+}
+function audioExtension(file) {
+  const match = String(file.name || '').match(/\.([a-z0-9]{2,5})$/i);
+  return match ? match[1].toLowerCase() : ({ 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/flac': 'flac', 'audio/mp4': 'm4a', 'audio/aac': 'aac', 'audio/ogg': 'ogg' }[file.type] || 'audio');
+}
+async function trackWorkspace(clientId, env) {
+  const db = clientDb(env);
+  const [tracks, versions, comments] = await db.batch([
+    db.prepare("SELECT id, title, stage, category, requested_service AS requestedService, source_track_id AS sourceTrackId, CASE WHEN paid_cents >= amount_cents THEN 'paid' WHEN paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, amount_cents AS amountCents, paid_cents AS paidCents, payment_url AS paymentUrl, samply_url AS samplyUrl, created_at AS createdAt FROM client_tracks WHERE client_id = ? ORDER BY created_at DESC").bind(clientId),
+    db.prepare('SELECT v.id, v.track_id AS trackId, v.label, v.original_name AS originalName, v.mime_type AS mimeType, v.size_bytes AS sizeBytes, v.created_by AS createdBy, v.created_at AS createdAt FROM client_track_versions v JOIN client_tracks t ON t.id = v.track_id WHERE t.client_id = ? ORDER BY v.created_at DESC').bind(clientId),
+    db.prepare('SELECT c.id, c.track_id AS trackId, c.version_id AS versionId, c.author_type AS authorType, c.body, c.created_at AS createdAt FROM client_track_comments c JOIN client_tracks t ON t.id = c.track_id WHERE t.client_id = ? ORDER BY c.created_at ASC').bind(clientId)
+  ]);
+  const versionsByTrack = new Map();
+  for (const version of versions.results) versionsByTrack.set(version.trackId, [...(versionsByTrack.get(version.trackId) || []), version]);
+  const commentsByTrack = new Map();
+  for (const comment of comments.results) commentsByTrack.set(comment.trackId, [...(commentsByTrack.get(comment.trackId) || []), comment]);
+  return tracks.results.map(track => ({ ...track, versions: versionsByTrack.get(track.id) || [], comments: commentsByTrack.get(track.id) || [] }));
+}
+async function clientOwnedTrack(db, clientId, trackId) {
+  const track = await db.prepare('SELECT id, client_id AS clientId, title, category FROM client_tracks WHERE id = ? AND client_id = ?').bind(trackId, clientId).first();
+  if (!track) throw inputError('Música não encontrada.');
+  return track;
+}
+async function createTrackVersion(db, env, track, file, label, actor) {
+  safeAudioFile(file);
+  if (!env.CLIENT_AUDIO) throw new Error('O armazenamento de áudio ainda não foi configurado.');
+  const id = randomId();
+  const key = `clients/${track.clientId}/${track.id}/${id}.${audioExtension(file)}`;
+  await env.CLIENT_AUDIO.put(key, file.stream(), { httpMetadata: { contentType: file.type || 'audio/mpeg', contentDisposition: `attachment; filename="${String(file.name || 'audio').replace(/["\\]/g, '')}"` } });
+  await db.prepare('INSERT INTO client_track_versions (id, track_id, label, storage_key, original_name, mime_type, size_bytes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, track.id, String(label || 'Nova versão').trim().slice(0, 120) || 'Nova versão', key, String(file.name || 'audio').slice(0, 240), file.type || 'audio/mpeg', file.size, actor).run();
+  return { id, trackId: track.id, label: String(label || 'Nova versão').trim().slice(0, 120) || 'Nova versão', originalName: String(file.name || 'audio'), mimeType: file.type || 'audio/mpeg', sizeBytes: file.size, createdBy: actor };
+}
+async function trackFileResponse(env, db, trackId, versionId) {
+  const version = await db.prepare('SELECT id, storage_key AS storageKey, original_name AS originalName, mime_type AS mimeType FROM client_track_versions WHERE id = ? AND track_id = ?').bind(versionId, trackId).first();
+  if (!version) return error('Versão não encontrada.', 404);
+  const object = await env.CLIENT_AUDIO?.get(version.storageKey);
+  if (!object) return error('Ficheiro não encontrado.', 404);
+  return new Response(object.body, { headers: { 'content-type': version.mimeType || object.httpMetadata?.contentType || 'audio/mpeg', 'content-length': String(object.size), 'content-disposition': `attachment; filename="${String(version.originalName).replace(/["\\]/g, '')}"`, 'cache-control': 'private, max-age=300' } });
 }
 function appointmentDate(value, label) {
   const date = new Date(String(value || ''));
@@ -981,7 +1131,11 @@ async function portalAdminMutation(request, env, resource, id) {
     if (!clientId || !title) return error('Dados incompletos.');
     const itemId = randomId();
     const payment = paymentDetails(body.amount, body.paidAmount, paymentStatus(body.paymentStatus || 'pending'));
-    if (isTrack) await db.prepare('INSERT INTO client_tracks (id, client_id, title, stage, payment_status, amount_cents, paid_cents, payment_url, samply_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(itemId, clientId, title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', payment.paymentStatus, payment.amountCents, payment.paidCents, paymentUrl(body.paymentUrl), samplyPlayerUrl(body.samplyUrl)).run();
+    if (isTrack) {
+      const category = trackCategory(String(body.category || 'mix-master'));
+      const service = category === 'mix-master' && body.requestedService ? requestedMixService((await contentFromGitHub(env)).content, body.requestedService) : null;
+      await db.prepare('INSERT INTO client_tracks (id, client_id, title, stage, category, requested_service, source_track_id, payment_status, amount_cents, paid_cents, payment_url, samply_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(itemId, clientId, title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', category, service?.id || null, body.sourceTrackId || null, payment.paymentStatus, payment.amountCents, payment.paidCents, paymentUrl(body.paymentUrl), samplyPlayerUrl(body.samplyUrl)).run();
+    }
     else await db.prepare('INSERT INTO client_bookings (id, client_id, service, starts_at, payment_status, amount_cents, paid_cents, payment_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(itemId, clientId, title, body.startsAt || null, payment.paymentStatus, payment.amountCents, payment.paidCents, paymentUrl(body.paymentUrl)).run();
     await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), clientId, admin.login, `${resource}.created`).run();
     return jsonResponse({ id: itemId }, 201);
@@ -996,7 +1150,11 @@ async function portalAdminMutation(request, env, resource, id) {
   const title = String((isTrack ? body.title : body.service) || '').trim();
   if (!title) return error('Título inválido.');
   const payment = paymentDetails(body.amount, body.paidAmount, paymentStatus(body.paymentStatus || 'pending'));
-  if (isTrack) await db.prepare('UPDATE client_tracks SET title = ?, stage = ?, payment_status = ?, amount_cents = ?, paid_cents = ?, payment_url = ?, samply_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', payment.paymentStatus, payment.amountCents, payment.paidCents, paymentUrl(body.paymentUrl), samplyPlayerUrl(body.samplyUrl), id).run();
+  if (isTrack) {
+    const category = trackCategory(String(body.category || 'mix-master'));
+    const service = category === 'mix-master' && body.requestedService ? requestedMixService((await contentFromGitHub(env)).content, body.requestedService) : null;
+    await db.prepare('UPDATE client_tracks SET title = ?, stage = ?, category = ?, requested_service = ?, source_track_id = ?, payment_status = ?, amount_cents = ?, paid_cents = ?, payment_url = ?, samply_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(title, ['start', 'mix', 'master'].includes(body.stage) ? body.stage : 'start', category, service?.id || null, body.sourceTrackId || null, payment.paymentStatus, payment.amountCents, payment.paidCents, paymentUrl(body.paymentUrl), samplyPlayerUrl(body.samplyUrl), id).run();
+  }
   else await db.prepare('UPDATE client_bookings SET service = ?, starts_at = ?, payment_status = ?, amount_cents = ?, paid_cents = ?, payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(title, body.startsAt || null, payment.paymentStatus, payment.amountCents, payment.paidCents, paymentUrl(body.paymentUrl), id).run();
   await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action) VALUES (?, ?, ?, ?)').bind(randomId(), item.client_id, admin.login, `${resource}.updated`).run();
   return jsonResponse({ ok: true });
@@ -1050,9 +1208,13 @@ export default {
       else if (url.pathname === '/client/auth/login' && request.method === 'POST') response = await clientLogin(request, env);
       else if (url.pathname === '/client/auth/logout' && request.method === 'POST') response = await clientLogout(request, env);
       else if (url.pathname === '/client/portal' && request.method === 'GET') response = await clientPortal(request, env);
+      else if (url.pathname === '/client/tracks' && request.method === 'POST') response = await clientTrackRequest(request, env);
       else if (url.pathname === '/client/artist-profile' && ['GET', 'PATCH'].includes(request.method)) response = await clientArtistProfile(request, env);
       else if (url.pathname === '/client/artist-image' && request.method === 'POST') response = await clientArtistImage(request, env);
       else if (url.pathname === '/artists/profiles' && request.method === 'GET') response = await publicArtistProfiles(env);
+      else if (/^\/client\/tracks\/[0-9a-f-]{36}\/versions$/i.test(url.pathname) && request.method === 'POST') response = await clientTrackVersion(request, env, url.pathname.split('/')[3]);
+      else if (/^\/client\/tracks\/[0-9a-f-]{36}\/comments$/i.test(url.pathname) && request.method === 'POST') response = await clientTrackComment(request, env, url.pathname.split('/')[3]);
+      else if (/^\/client\/tracks\/[0-9a-f-]{36}\/versions\/[0-9a-f-]{36}\/file$/i.test(url.pathname) && request.method === 'GET') response = await clientTrackFile(request, env, url.pathname.split('/')[3], url.pathname.split('/')[5]);
       else if (/^\/client\/appointments\/[0-9a-f-]{36}$/i.test(url.pathname) && ['GET', 'PATCH', 'DELETE'].includes(request.method)) response = await clientAppointment(request, env, url.pathname.split('/').pop());
       else if (url.pathname === '/google-calendar/status' && request.method === 'GET') response = await googleCalendarStatus(request, env);
       else if (url.pathname === '/google-calendar/connect' && request.method === 'POST') response = await googleCalendarConnect(request, env);
@@ -1065,6 +1227,9 @@ export default {
       else if (url.pathname === '/finance/summary' && request.method === 'GET') response = await financeSummary(request, env);
       else if (url.pathname === '/dashboard/summary' && request.method === 'GET') response = await dashboardSummary(request, env);
       else if (url.pathname === '/client/admin/clients' && request.method === 'POST') response = await portalCreateClient(request, env);
+      else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/versions$/i.test(url.pathname) && request.method === 'POST') response = await adminTrackVersion(request, env, url.pathname.split('/')[4]);
+      else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/comments$/i.test(url.pathname) && request.method === 'POST') response = await adminTrackComment(request, env, url.pathname.split('/')[4]);
+      else if (/^\/client\/admin\/tracks\/[0-9a-f-]{36}\/versions\/[0-9a-f-]{36}\/file$/i.test(url.pathname) && request.method === 'GET') response = await adminTrackFile(request, env, url.pathname.split('/')[4], url.pathname.split('/')[6]);
       else if (/^\/client\/admin\/clients\/[0-9a-f-]{36}$/i.test(url.pathname) && request.method === 'GET') response = await portalAdminClient(request, env, url.pathname.split('/').pop());
       else if (url.pathname === '/studio/appointments' && request.method === 'GET') response = await studioSchedule(request, env);
       else if (url.pathname === '/studio/appointments' && request.method === 'POST') response = await studioSchedule(request, env);

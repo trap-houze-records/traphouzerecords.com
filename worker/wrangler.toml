@@ -23,6 +23,10 @@ binding = "CLIENT_PORTAL_DB"
 database_name = "trap-houze-client-portal"
 database_id = "aa038bcd-3a07-48d6-8e84-d3352b1ef121"
 
+[[r2_buckets]]
+binding = "CLIENT_AUDIO"
+bucket_name = "trap-houze-client-audio"
+
 # Criar como secrets no Cloudflare, nunca neste ficheiro:
 # GITHUB_OAUTH_CLIENT_ID
 # GITHUB_OAUTH_CLIENT_SECRET
