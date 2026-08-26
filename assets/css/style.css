@@ -1205,12 +1205,11 @@ footer p {
 .track-submission input, .track-submission select, .track-upload-form input, .track-comment-form textarea { min-width: 0; }
 .track-submission-actions { align-items: center; display: flex; gap: 15px; }
 .track-submission-actions button:first-child, .track-upload-form button, .track-comment-form button { background: #16c7f3; border: 1px solid #16c7f3; color: #071013; cursor: pointer; font: inherit; padding: 9px 13px; }
-.recording-request { border-top: 1px solid rgba(255,255,255,.1); margin-top: 16px; padding-top: 14px; }
-.recording-request > button { align-items: center; background: transparent; border: 1px solid #16c7f3; color: #16c7f3; cursor: pointer; display: inline-flex; font: inherit; gap: 18px; padding: 10px 13px; }
-.recording-request > button:hover { background: #16c7f3; color: #071013; }
-.track-submission-recording { margin: 14px 0 0; padding: 16px; }
+.track-submission-recording { align-items: end; background: rgba(0,0,0,.16); border: 0; border-top: 1px solid rgba(255,255,255,.12); grid-template-columns: minmax(220px, 1fr) auto; margin: 0; padding: 14px 0 0; }
+.track-submission-recording .track-submission-actions { padding-bottom: 1px; }
 .track-player { background: linear-gradient(135deg, #09283d 0%, #0b3450 62%, #0a2a42 100%); border: 1px solid rgba(22,199,243,.42); display: grid; gap: 16px; margin-top: 16px; overflow: hidden; padding: 18px; }
 .track-player-heading { align-items: center; display: flex; gap: 18px; justify-content: space-between; min-width: 0; }
+.track-player-actions { align-items: center; display: flex; flex: 0 0 auto; gap: 8px; }
 .track-player-identity { align-items: center; display: grid; gap: 13px; grid-template-columns: 48px minmax(0, 1fr); min-width: 0; }
 .track-player-identity img { background: #050505; border: 1px solid rgba(255,255,255,.13); height: 48px; object-fit: contain; padding: 6px; width: 48px; }
 .track-player-identity div { display: grid; gap: 3px; min-width: 0; }
@@ -1219,6 +1218,7 @@ footer p {
 .track-player-identity small, .track-player-foot { color: rgba(255,255,255,.55); font-size: .72rem; }
 .track-player-download { background: transparent; border: 1px solid rgba(255,255,255,.3); color: #fff; cursor: pointer; flex: 0 0 auto; font: inherit; font-size: .74rem; padding: 9px 11px; }
 .track-player-download:hover { border-color: #16c7f3; color: #16c7f3; }
+.track-player-submit { background: #16c7f3; border: 1px solid #16c7f3; color: #06131b; cursor: pointer; font: inherit; font-size: .74rem; padding: 9px 11px; }
 .track-player-versions { display: flex; flex-wrap: wrap; gap: 6px; }
 .track-player-versions button { background: rgba(255,255,255,.06); border: 1px solid transparent; color: rgba(255,255,255,.66); cursor: pointer; font: inherit; font-size: .75rem; min-width: 45px; padding: 7px 10px; }
 .track-player-versions button:hover { border-color: rgba(22,199,243,.55); color: #fff; }
@@ -1515,9 +1515,12 @@ footer p {
     .manager-track-comment button { justify-self: start; }
     .track-player { gap: 14px; padding: 15px; }
     .track-player-heading { align-items: flex-start; display: grid; grid-template-columns: minmax(0, 1fr); }
+    .track-player-actions { flex-wrap: wrap; }
     .track-player-identity { grid-template-columns: 40px minmax(0, 1fr); }
     .track-player-identity img { height: 40px; width: 40px; }
     .track-player-download { justify-self: start; padding: 7px 8px; }
+    .track-submission-recording { grid-template-columns: 1fr; }
+    .track-submission-recording .track-submission-actions { flex-wrap: wrap; }
     .track-player-controls { grid-template-columns: auto auto minmax(60px, 1fr) auto; }
     .track-player-toggle { grid-column: auto; justify-self: auto; }
     .client-simple-help { align-items: flex-start; flex-direction: column; }

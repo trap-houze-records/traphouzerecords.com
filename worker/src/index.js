@@ -380,6 +380,11 @@ async function clientTrackRequest(request, env) {
   if (sourceTrackId) {
     const source = await clientOwnedTrack(db, session.clientId, sourceTrackId);
     if (source.category !== 'recording') return error('A origem tem de ser uma gravação tua.', 400);
+    if (!['mix', 'mix-master'].includes(service?.id)) return error('Uma gravação só pode ser submetida para Mix ou Mix & Master.', 400);
+    const amountCents = Math.round((service?.price || 0) * 100);
+    await db.prepare("UPDATE client_tracks SET title = ?, stage = 'mix', category = 'mix-master', requested_service = ?, source_track_id = NULL, payment_status = 'pending', amount_cents = ?, paid_cents = 0, payment_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND client_id = ? AND category = 'recording'").bind(source.title, service.id, amountCents, source.id, session.clientId).run();
+    await db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'recordings.submitted', JSON.stringify({ id: source.id, requestedService: service.id })).run();
+    return jsonResponse({ id: source.id, title: source.title, category: 'mix-master', stage: 'mix', requestedService: service.id }, 201);
   }
   const id = randomId();
   await db.prepare('INSERT INTO client_tracks (id, client_id, title, stage, category, requested_service, source_track_id, payment_status, amount_cents, paid_cents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)').bind(id, session.clientId, title, 'start', category, service?.id || null, sourceTrackId, 'pending', Math.round((service?.price || 0) * 100)).run();
