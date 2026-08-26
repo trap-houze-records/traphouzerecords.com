@@ -109,7 +109,7 @@ function renderTrack(track) {
     <div class="track-heading"><p class="eyebrow">${trackServiceLabel(track)}</p><h2>${escapeHtml(track.title)}</h2></div>
     ${stagesPanel}
     ${renderTrackPlayer(track, versions)}
-    <button type="button" class="track-comments-toggle" data-toggle-track-comments="${escapeHtml(track.id)}" aria-expanded="${commentsOpen ? 'true' : 'false'}">Comentários <span>${comments.length}</span></button>${commentsPanel}
+    ${track.category === 'recording' ? '' : `<button type="button" class="track-comments-toggle" data-toggle-track-comments="${escapeHtml(track.id)}" aria-expanded="${commentsOpen ? 'true' : 'false'}">Comentários <span>${comments.length}</span></button>${commentsPanel}`}
     ${track.category === 'recording' ? '' : `<div class="track-payment ${track.paymentStatus}">${paymentLabel(track) ? `<span>${paymentLabel(track)}</span>` : ''}${track.due === 0 ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.due)}</button>`}</div>`}
   </article>`;
 }
