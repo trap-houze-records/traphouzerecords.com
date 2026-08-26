@@ -1320,6 +1320,7 @@ footer p {
 .booking-section-upcoming { margin-top: 0; }
 .booking-section-history { margin-top: 46px; }
 .client-empty { border-top: 1px solid rgba(255,255,255,.15); color: rgba(255,255,255,.48); font-size: .86rem; padding: 18px 0; }
+.track-list > .client-empty { border-top: 0; }
 .booking-section-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 18px; }
 .booking-section-heading h2 { margin-top: 7px; font-size: 1.55rem; letter-spacing: .02em; text-transform: uppercase; }
 .booking-section-heading > span { color: rgba(255,255,255,.4); font-size: .78rem; }
