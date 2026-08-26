@@ -2,7 +2,8 @@ window.FinanceModule = (() => {
   const money = cents => (Number(cents || 0) / 100).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
   const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
   const date = value => value ? new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${String(value).replace(' ', 'T')}Z`)) : 'Sem data';
-  const recordLabel = item => item.type === 'track' ? `Música · ${item.stage || 'Iniciar'}` : item.type === 'appointment' ? 'Sessão na agenda' : 'Reserva manual';
+  const stageLabel = stage => ({ start: 'Gravação', mix: 'Mix', master: 'Master' }[stage] || 'Gravação');
+  const recordLabel = item => item.type === 'track' ? `Música · ${stageLabel(item.stage)}` : item.type === 'appointment' ? 'Sessão na agenda' : 'Reserva manual';
 
   function mount(root, options) {
     let bookingServices = (options.bookingServices || []).map(item => ({ ...item }));
