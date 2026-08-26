@@ -697,11 +697,17 @@ async function clientOwnedTrack(db, clientId, trackId) {
 async function createTrackVersion(db, env, track, file, label, actor) {
   safeAudioFile(file);
   if (!env.CLIENT_AUDIO) throw new Error('O armazenamento de áudio ainda não foi configurado.');
+  const existing = await db.prepare('SELECT COUNT(*) AS total FROM client_track_versions WHERE track_id = ?').bind(track.id).first();
+  let versionLabel = String(label || 'Nova versão').trim().slice(0, 120) || 'Nova versão';
+  if (Number(existing?.total || 0) === 0) {
+    const details = await db.prepare('SELECT category, requested_service AS requestedService FROM client_tracks WHERE id = ?').bind(track.id).first();
+    versionLabel = details?.category === 'mix-master' && details?.requestedService === 'master' ? 'Mix' : 'Gravação';
+  }
   const id = randomId();
   const key = `clients/${track.clientId}/${track.id}/${id}.${audioExtension(file)}`;
   await env.CLIENT_AUDIO.put(key, file.stream(), { httpMetadata: { contentType: file.type || 'audio/mpeg', contentDisposition: `attachment; filename="${String(file.name || 'audio').replace(/["\\]/g, '')}"` } });
-  await db.prepare('INSERT INTO client_track_versions (id, track_id, label, storage_key, original_name, mime_type, size_bytes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, track.id, String(label || 'Nova versão').trim().slice(0, 120) || 'Nova versão', key, String(file.name || 'audio').slice(0, 240), file.type || 'audio/mpeg', file.size, actor).run();
-  return { id, trackId: track.id, label: String(label || 'Nova versão').trim().slice(0, 120) || 'Nova versão', originalName: String(file.name || 'audio'), mimeType: file.type || 'audio/mpeg', sizeBytes: file.size, createdBy: actor };
+  await db.prepare('INSERT INTO client_track_versions (id, track_id, label, storage_key, original_name, mime_type, size_bytes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, track.id, versionLabel, key, String(file.name || 'audio').slice(0, 240), file.type || 'audio/mpeg', file.size, actor).run();
+  return { id, trackId: track.id, label: versionLabel, originalName: String(file.name || 'audio'), mimeType: file.type || 'audio/mpeg', sizeBytes: file.size, createdBy: actor };
 }
 async function trackFileResponse(env, db, trackId, versionId) {
   const version = await db.prepare('SELECT id, storage_key AS storageKey, original_name AS originalName, mime_type AS mimeType FROM client_track_versions WHERE id = ? AND track_id = ?').bind(versionId, trackId).first();

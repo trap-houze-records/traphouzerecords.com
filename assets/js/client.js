@@ -64,13 +64,22 @@ async function apiRequest(path, options = {}) {
 function trackServiceLabel(track) {
   return track.category === 'recording' ? 'Gravação' : ({ mix: 'Mix', master: 'Master', 'mix-master': 'Mix & Master' }[track.requestedService] || 'Em produção');
 }
+function trackProgress(track) {
+  if (track.requestedService === 'mix') {
+    return { steps: stages.slice(0, 2), active: track.stage === 'start' ? 'start' : 'mix' };
+  }
+  if (track.requestedService === 'master') {
+    return { steps: stages.slice(1), active: track.stage === 'master' ? 'master' : 'mix' };
+  }
+  return { steps: stages, active: track.stage };
+}
 function trackSubmissionForm(sourceTrack = null) {
   const services = (clientData.mixMasterServices || []).filter(service => !sourceTrack || ['mix', 'mix-master'].includes(service.id));
   const serviceOptions = services.map(service => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.title)} · ${money(service.price)}</option>`).join('');
   const sourceId = sourceTrack?.id || '';
   const sourceTitle = sourceTrack?.title || '';
   if (sourceTrack) return `<form class="track-submission track-submission-recording" data-track-submission data-source-track-id="${escapeHtml(sourceId)}" data-source-track-title="${escapeHtml(sourceTitle)}">
-    <label>Serviço para “${escapeHtml(sourceTitle)}”<select name="requestedService" required><option value="" selected disabled>Escolher Mix ou Mix & Master</option>${serviceOptions}</select></label>
+    <label><span>Selecionar serviço</span><select name="requestedService" required><option value="" selected disabled>Mix ou Mix & Master</option>${serviceOptions}</select></label>
     <div class="track-submission-actions"><button type="submit">Submeter <span>→</span></button><button type="button" class="client-link" data-close-track-submit>Cancelar</button></div>
   </form>`;
   return `<form class="track-submission ${sourceTrack ? 'track-submission-recording' : ''}" data-track-submission data-source-track-id="${escapeHtml(sourceId)}" data-source-track-title="${escapeHtml(sourceTitle)}">
@@ -83,12 +92,12 @@ function trackSubmissionForm(sourceTrack = null) {
 }
 function versionFileSize(size) { return Number(size || 0) >= 1024 * 1024 ? `${(Number(size) / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(Number(size || 0) / 1024))} KB`; }
 function renderTrackPlayer(track, versions) {
-  if (!versions.length) return `<div class="track-player-empty"><strong>Sem áudio disponível</strong><span>A Trap Houze ainda não adicionou uma versão a esta música.</span>${track.category === 'recording' ? `<button type="button" class="track-player-submit" data-submit-recording="${escapeHtml(track.id)}">Submeter para Mix & Master</button>${submittingTrack === track.id ? trackSubmissionForm(track) : ''}` : ''}</div>`;
+  if (!versions.length) return `<div class="track-player-empty"><strong>Sem áudio disponível</strong><span>A Trap Houze ainda não adicionou uma versão a esta música.</span>${track.category === 'recording' ? `${submittingTrack !== track.id ? `<button type="button" class="track-player-submit" data-submit-recording="${escapeHtml(track.id)}">Submeter para Mix & Master</button>` : ''}${submittingTrack === track.id ? trackSubmissionForm(track) : ''}` : ''}</div>`;
   const active = versions[0];
   return `<section class="track-player" data-track-player="${escapeHtml(track.id)}">
     <div class="track-player-heading">
       <div class="track-player-identity"><img src="/images/Logo.png" alt=""><div><span>Trap Houze Player</span><strong data-player-filename>${escapeHtml(active.originalName || track.title)}</strong><small data-player-filemeta>${escapeHtml(active.label)} · ${versionFileSize(active.sizeBytes)}</small></div></div>
-      <div class="track-player-actions">${track.category === 'recording' ? `<button type="button" class="track-player-submit" data-submit-recording="${escapeHtml(track.id)}">Submeter para Mix & Master</button>` : ''}<button type="button" class="track-player-download" data-download-version="${escapeHtml(active.id)}" data-track-id="${escapeHtml(track.id)}">Descarregar</button></div>
+      <div class="track-player-actions">${track.category === 'recording' && submittingTrack !== track.id ? `<button type="button" class="track-player-submit" data-submit-recording="${escapeHtml(track.id)}">Submeter para Mix & Master</button>` : ''}<button type="button" class="track-player-download" data-download-version="${escapeHtml(active.id)}" data-track-id="${escapeHtml(track.id)}">Descarregar</button></div>
     </div>
     <div class="track-player-versions" role="tablist" aria-label="Versões de ${escapeHtml(track.title)}">
       ${versions.map((version, index) => `<button type="button" role="tab" aria-selected="${index === 0 ? 'true' : 'false'}" class="${index === 0 ? 'active' : ''}" data-player-version="${escapeHtml(version.id)}" data-track-id="${escapeHtml(track.id)}" data-version-label="${escapeHtml(version.label)}" data-version-name="${escapeHtml(version.originalName || track.title)}" data-version-size="${escapeHtml(versionFileSize(version.sizeBytes))}">${escapeHtml(version.label)}</button>`).join('')}
@@ -108,8 +117,9 @@ function renderTrack(track) {
   const versions = track.versions || [];
   const comments = track.comments || [];
   const latest = versions[0];
-  const stagesPanel = track.category === 'recording' ? '' : `<div class="track-stages" aria-label="Estado do trabalho">${stages.map(([id, label], index) => {
-    const activeIndex = stages.findIndex(([stage]) => stage === String(track.stage).toLowerCase());
+  const progress = trackProgress(track);
+  const stagesPanel = track.category === 'recording' ? '' : `<div class="track-stages steps-${progress.steps.length}" aria-label="Estado do trabalho">${progress.steps.map(([id, label], index) => {
+    const activeIndex = progress.steps.findIndex(([stage]) => stage === String(progress.active).toLowerCase());
     const state = index < activeIndex ? 'complete' : index === activeIndex ? 'current' : '';
     return `<div class="track-stage ${state}"><span>${index + 1}</span><strong>${label}</strong></div>`;
   }).join('')}</div>`;
@@ -453,7 +463,7 @@ document.addEventListener('submit', event => {
     apiRequest('/client/tracks', { method: 'POST', body: JSON.stringify({ title, category, requestedService: form.get('requestedService'), sourceTrackId }) }).then(async track => {
       const file = form.get('file');
       if (file instanceof File && file.size) {
-        const upload = new FormData(); upload.append('file', file); upload.append('label', 'Versão inicial');
+        const upload = new FormData(); upload.append('file', file); upload.append('label', form.get('requestedService') === 'master' ? 'Mix' : 'Gravação');
         const response = await fetch(`${apiBase}/client/tracks/${encodeURIComponent(track.id)}/versions`, { method: 'POST', headers: { Authorization: `Bearer ${apiToken}` }, body: upload });
         const result = await response.json(); if (!response.ok) throw new Error(result.error || 'O pedido foi criado, mas o áudio não foi enviado.');
       }
