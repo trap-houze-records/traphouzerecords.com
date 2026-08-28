@@ -1,6 +1,6 @@
 # Notificações de reservas por e-mail
 
-Cada reserva criada pelo público ou por um artista com sessão iniciada, bem como cada reagendamento do artista, envia um e-mail para `traphouzerec@gmail.com`.
+Cada reserva criada pelo público ou por um artista com sessão iniciada, bem como cada reagendamento do artista, envia um e-mail para `booking@traphouzerecords.com`.
 
 O Worker usa a API do Resend. A reserva é guardada mesmo que o fornecedor de e-mail esteja temporariamente indisponível; o erro fica registado no log do Worker para ser verificado.
 
@@ -17,7 +17,7 @@ npx wrangler secret put RESEND_API_KEY
 
 5. Cole a chave quando o Wrangler pedir o valor e faça o deploy do Worker.
 
-O remetente configurado é `Agenda Trap Houze <reservas@notify.traphouzerecords.com>` e o destinatário é `traphouzerec@gmail.com`. Ambos podem ser alterados em `worker/wrangler.toml` antes do deploy.
+O remetente configurado é `Agenda Trap Houze <reservas@notify.traphouzerecords.com>` e o destinatário é `booking@traphouzerecords.com`. Ambos podem ser alterados em `worker/wrangler.toml` antes do deploy.
 
 ## Conteúdo da notificação
 

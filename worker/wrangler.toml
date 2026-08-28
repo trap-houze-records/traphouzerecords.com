@@ -15,7 +15,7 @@ ALLOWED_GITHUB_USERS = "trap-houze-records"
 GITHUB_INSTALLATION_ID = "153174915"
 GOOGLE_CALENDAR_DEFAULT_ID = "bab49f46fa47e6fb7a9ffc1fe4ec50ccf2922a6775ffc14891d2bafe2d053537@group.calendar.google.com"
 GOOGLE_CALENDAR_DEFAULT_NAME = "Booking"
-BOOKING_NOTIFICATION_EMAIL = "traphouzerec@gmail.com"
+BOOKING_NOTIFICATION_EMAIL = "booking@traphouzerecords.com"
 BOOKING_NOTIFICATION_FROM = "Agenda Trap Houze <reservas@notify.traphouzerecords.com>"
 
 [[d1_databases]]
