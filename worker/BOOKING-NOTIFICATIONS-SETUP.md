@@ -2,22 +2,13 @@
 
 Cada reserva criada pelo público ou por um artista com sessão iniciada, bem como cada reagendamento do artista, envia um e-mail para `booking@traphouzerecords.com`.
 
-O Worker usa a API do Resend. A reserva é guardada mesmo que o fornecedor de e-mail esteja temporariamente indisponível; o erro fica registado no log do Worker para ser verificado.
+O Worker usa o serviço de e-mail nativo da Cloudflare. O endereço `booking@traphouzerecords.com` encaminha para a caixa verificada `traphouzerec@gmail.com`. A reserva é guardada mesmo que o fornecedor de e-mail esteja temporariamente indisponível; o erro fica registado no log do Worker para ser verificado.
 
-## Ativação única
+## Configuração
 
-1. Crie uma conta no [Resend](https://resend.com) e adicione o domínio `notify.traphouzerecords.com`.
-2. No Resend, escolha a ligação à Cloudflare para inserir automaticamente os registos DNS de envio e valide o domínio.
-3. Crie uma API key com permissões de envio.
-4. Na pasta `worker`, execute:
+O Email Routing de `traphouzerecords.com` deve estar ativo. A caixa de entrega `traphouzerec@gmail.com` deve permanecer verificada na conta Cloudflare e associada ao binding `BOOKING_MAILER` em `worker/wrangler.toml`.
 
-```powershell
-npx wrangler secret put RESEND_API_KEY
-```
-
-5. Cole a chave quando o Wrangler pedir o valor e faça o deploy do Worker.
-
-O remetente configurado é `Agenda Trap Houze <reservas@notify.traphouzerecords.com>` e o destinatário é `booking@traphouzerecords.com`. Ambos podem ser alterados em `worker/wrangler.toml` antes do deploy.
+O remetente configurado é `Agenda Trap Houze <booking@traphouzerecords.com>` e a identidade de resposta é `booking@traphouzerecords.com`.
 
 ## Conteúdo da notificação
 
@@ -26,4 +17,4 @@ O remetente configurado é `Agenda Trap Houze <reservas@notify.traphouzerecords.
 - Serviço, dia, hora de início e fim.
 - Estado e notas deixadas pelo cliente.
 
-`RESEND_API_KEY` é um segredo do Cloudflare: não deve ser adicionado ao Git nem enviado pelo chat.
+`RESEND_API_KEY` continua suportado apenas como fallback opcional, caso o binding nativo da Cloudflare seja removido.

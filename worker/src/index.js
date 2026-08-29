@@ -946,10 +946,13 @@ function bookingNotificationTime(value) {
   return year && month && day && clock ? `${day}/${month}/${year} · ${clock}` : String(value || '—');
 }
 async function sendBookingNotification(env, appointment, { kind = 'nova', clientName = '', clientEmail = '' } = {}) {
-  const apiKey = String(env.RESEND_API_KEY || '').trim();
   const recipient = String(env.BOOKING_NOTIFICATION_EMAIL || '').trim();
+  const deliveryRecipient = String(env.BOOKING_NOTIFICATION_DELIVERY_EMAIL || recipient).trim();
   const sender = String(env.BOOKING_NOTIFICATION_FROM || '').trim();
-  if (!apiKey || !recipient || !sender) return false;
+  if (!recipient || !deliveryRecipient || !sender) {
+    console.error('E-mail: destinatário ou remetente não configurado.');
+    return false;
+  }
   const name = clientName || appointment.guestName || 'Cliente';
   const label = kind === 'reagendada' ? 'Reserva reagendada' : 'Nova reserva';
   const period = `${bookingNotificationTime(appointment.startsAt)} — ${String(appointment.endsAt || '').slice(11, 16)}`;
@@ -964,15 +967,34 @@ async function sendBookingNotification(env, appointment, { kind = 'nova', client
     appointment.notes ? `Notas: ${appointment.notes}` : ''
   ].filter(Boolean);
   const details = lines.slice(2).map(line => `<p style="margin:0 0 9px">${escapeHtml(line)}</p>`).join('');
+  const subject = `${label} — ${name}`;
+  const html = `<div style="background:#111;color:#fff;font-family:Arial,sans-serif;padding:28px"><p style="color:#16c7f3;font-size:12px;letter-spacing:1.6px;margin:0 0 12px;text-transform:uppercase">Trap Houze Records</p><h1 style="font-size:24px;margin:0 0 22px">${escapeHtml(label)}</h1>${details}<p style="border-top:1px solid #3a3a3a;color:#aaa;font-size:12px;margin:22px 0 0;padding-top:16px">Enviado automaticamente pela agenda Trap Houze.</p></div>`;
+  if (env.BOOKING_MAILER?.send) {
+    const senderAddress = sender.match(/<([^>]+)>/)?.[1] || sender;
+    await env.BOOKING_MAILER.send({
+      from: { email: senderAddress, name: 'Agenda Trap Houze' },
+      to: deliveryRecipient,
+      replyTo: recipient,
+      subject,
+      text: lines.join('\n'),
+      html
+    });
+    return true;
+  }
+  const apiKey = String(env.RESEND_API_KEY || '').trim();
+  if (!apiKey) {
+    console.error('E-mail: nenhum serviço de envio configurado.');
+    return false;
+  }
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
     body: JSON.stringify({
       from: sender,
       to: [recipient],
-      subject: `${label} — ${name}`,
+      subject,
       text: lines.join('\n'),
-      html: `<div style="background:#111;color:#fff;font-family:Arial,sans-serif;padding:28px"><p style="color:#16c7f3;font-size:12px;letter-spacing:1.6px;margin:0 0 12px;text-transform:uppercase">Trap Houze Records</p><h1 style="font-size:24px;margin:0 0 22px">${escapeHtml(label)}</h1>${details}<p style="border-top:1px solid #3a3a3a;color:#aaa;font-size:12px;margin:22px 0 0;padding-top:16px">Enviado automaticamente pela agenda Trap Houze.</p></div>`
+      html
     })
   });
   if (!response.ok) throw new Error(`Resend respondeu ${response.status}: ${(await response.text()).slice(0, 180)}`);

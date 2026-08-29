@@ -16,7 +16,12 @@ GITHUB_INSTALLATION_ID = "153174915"
 GOOGLE_CALENDAR_DEFAULT_ID = "bab49f46fa47e6fb7a9ffc1fe4ec50ccf2922a6775ffc14891d2bafe2d053537@group.calendar.google.com"
 GOOGLE_CALENDAR_DEFAULT_NAME = "Booking"
 BOOKING_NOTIFICATION_EMAIL = "booking@traphouzerecords.com"
-BOOKING_NOTIFICATION_FROM = "Agenda Trap Houze <reservas@notify.traphouzerecords.com>"
+BOOKING_NOTIFICATION_DELIVERY_EMAIL = "traphouzerec@gmail.com"
+BOOKING_NOTIFICATION_FROM = "Agenda Trap Houze <booking@traphouzerecords.com>"
+
+[[send_email]]
+name = "BOOKING_MAILER"
+destination_address = "traphouzerec@gmail.com"
 
 [[d1_databases]]
 binding = "CLIENT_PORTAL_DB"
@@ -35,4 +40,4 @@ bucket_name = "trap-houze-client-audio"
 # SESSION_SECRET (uma string aleatória longa)
 # GOOGLE_SERVICE_ACCOUNT_EMAIL
 # GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
-# RESEND_API_KEY
+# RESEND_API_KEY (opcional; fallback caso o binding de e-mail seja removido)
