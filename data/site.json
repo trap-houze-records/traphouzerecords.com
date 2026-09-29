@@ -360,6 +360,20 @@
       "clientId": "",
       "showBio": true,
       "showLinks": true
+    },
+    {
+      "name": "N0CME",
+      "genre": "",
+      "image": "",
+      "bio": "",
+      "instagram": "",
+      "youtube": "",
+      "spotify": "",
+      "appleMusic": "",
+      "spotifyPlaylist": "",
+      "clientId": "3ae0ea76-0c73-47c3-bab1-c7e8a2f4b3ad",
+      "showBio": true,
+      "showLinks": true
     }
   ],
   "reviews": [],
