@@ -18,7 +18,7 @@
   const service = () => services.find(item => item.id === selectedServiceId) || services[0];
   const duration = () => selectedSlots.length / 2;
   const durationText = () => `${duration().toLocaleString('pt-PT')} ${duration() === 1 ? 'hora' : 'horas'}`;
-  const isBookableDay = date => date >= today && date <= latestDate && date.getDay() >= 2 && date.getDay() <= 6;
+  const isBookableDay = date => date >= today && date <= latestDate;
   const isBusy = (start, end) => busy.some(item => new Date(`${String(item.startsAt).replace(' ', 'T')}Z`) < end && new Date(`${String(item.endsAt).replace(' ', 'T')}Z`) > start);
   const availabilityEnd = () => rules.fullDay ? 24 * 60 : minute(rules.endsAt);
   const isAvailable = (date, start) => {

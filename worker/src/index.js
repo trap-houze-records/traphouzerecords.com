@@ -547,7 +547,6 @@ async function clientAppointment(request, env, appointmentId) {
   const time = bookingTime(body.time);
   const duration = Number(body.duration);
   if (!Number.isFinite(duration) || duration < 2 || duration > 10 || Math.round(duration * 2) !== duration * 2) return error('A duração deve estar entre 2 e 10 horas, em blocos de 30 minutos.');
-  if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
   const startsAt = `${date} ${time}`;
   const endsAt = bookingEnd(startsAt, duration);
   const content = (await contentFromGitHub(env)).content;
@@ -1067,10 +1066,6 @@ function bookingEnd(startsAt, hours) {
   date.setTime(date.getTime() + hours * 3600000);
   return date.toISOString().slice(0, 16).replace('T', ' ');
 }
-function isBookableDay(date) {
-  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
-  return weekday >= 2 && weekday <= 6;
-}
 function bookingDateTime(date, time) { return `${date} ${time}`; }
 function bookingBlockedByRules(startsAt, endsAt, rules) {
   const date = startsAt.slice(0, 10);
@@ -1110,7 +1105,6 @@ async function publicBooking(request, env) {
   const time = bookingTime(body.time);
   const duration = Number(body.duration);
   if (!Number.isFinite(duration) || duration < 2 || duration > 10 || Math.round(duration * 2) !== duration * 2) return error('A duração deve ser entre 2 e 10 horas, em blocos de 30 minutos.');
-  if (!isBookableDay(date)) return error('Só é possível agendar de terça a sábado.');
   const startsAt = `${date} ${time}`;
   const endsAt = bookingEnd(startsAt, duration);
   const db = clientDb(env);
