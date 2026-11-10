@@ -240,7 +240,7 @@
     {
       "name": "Gleo",
       "genre": "Artista ",
-      "image": "",
+      "image": "images/artists/gleo-1794319554923-0b25c4be.jpg",
       "instagram": "",
       "youtube": "",
       "spotify": "",
@@ -280,7 +280,7 @@
     {
       "name": "Dypy",
       "genre": "",
-      "image": "",
+      "image": "images/artists/dypy-1794319567665-4998608a.jpg",
       "bio": "",
       "instagram": "",
       "youtube": "",
@@ -294,7 +294,7 @@
     {
       "name": "Reis",
       "genre": "",
-      "image": "",
+      "image": "images/artists/reis-1794319570694-80a5264d.jpg",
       "bio": "",
       "instagram": "",
       "youtube": "",
@@ -322,7 +322,7 @@
     {
       "name": "clxro",
       "genre": "",
-      "image": "",
+      "image": "images/artists/clxro-1794319581223-eddb906c.jpg",
       "bio": "",
       "instagram": "",
       "youtube": "",
@@ -350,7 +350,7 @@
     {
       "name": "Ressy",
       "genre": "",
-      "image": "",
+      "image": "images/artists/ressy-1794319586684-0739b2a8.jpg",
       "bio": "",
       "instagram": "",
       "youtube": "",
@@ -372,6 +372,20 @@
       "appleMusic": "",
       "spotifyPlaylist": "",
       "clientId": "3ae0ea76-0c73-47c3-bab1-c7e8a2f4b3ad",
+      "showBio": true,
+      "showLinks": true
+    },
+    {
+      "name": "Sheka",
+      "genre": "",
+      "image": "images/artists/sheka-1794319597939-96c8f888.jpg",
+      "bio": "",
+      "instagram": "",
+      "youtube": "",
+      "spotify": "",
+      "appleMusic": "",
+      "spotifyPlaylist": "",
+      "clientId": "",
       "showBio": true,
       "showLinks": true
     }
