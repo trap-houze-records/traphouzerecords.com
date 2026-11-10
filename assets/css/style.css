@@ -1168,7 +1168,6 @@ footer p {
     padding: 20px;
     flex: 1;
 }
-.tidycal-embed { min-height: 680px; }
 
 /* ========== ÁREA DO CLIENTE ========== */
 .client-page { min-height: 100vh; background: #0a0a0a; color: #f7f7f7; }
