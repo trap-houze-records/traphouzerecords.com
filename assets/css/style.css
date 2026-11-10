@@ -1070,6 +1070,8 @@ footer p {
     padding: 25px;
     z-index: 1400;
     display: none;
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
 }
 
 .help-popup.active {
@@ -1098,24 +1100,57 @@ footer p {
     color: #fff;
     font-size: 1.5rem;
     cursor: pointer;
+    align-items: center;
+    display: flex;
+    flex: 0 0 34px;
+    height: 34px;
+    justify-content: center;
+    line-height: 1;
+    width: 34px;
+}
+
+.help-content {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
 }
 
 .help-content p {
     color: rgba(255, 255, 255, 0.8);
-    line-height: 1.8;
-    margin-bottom: 15px;
+    line-height: 1.55;
+    margin: 0;
 }
 
-.help-contact a {
-    color: #fff;
+.help-links {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+}
+
+.help-links:empty {
+    display: none;
+}
+
+.help-links a {
+    color: #16c7f3;
     text-decoration: none;
     display: block;
-    margin-bottom: 10px;
+    font-size: .92rem;
+    line-height: 1.4;
+    max-width: 100%;
+    overflow-wrap: anywhere;
     transition: opacity 0.3s;
 }
 
-.help-contact a:hover {
+.help-links a:hover {
     opacity: 0.7;
+}
+
+.help-hours {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255,255,255,.58) !important;
+    font-size: .86rem;
+    padding-top: 14px;
 }
 
 /* ===== POPUP BOOKING ===== */
@@ -1718,6 +1753,7 @@ footer p {
         width: calc(100% - 40px);
         right: 20px;
         bottom: 80px;
+        padding: 22px;
     }
 
     .help-button {
