@@ -290,7 +290,9 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .finance-back-link:hover { border-color: rgba(22,199,243,.55); color: #16c7f3; }
 .finance-page .admin-notice { margin-bottom: 14px; }
 .finance-page .admin-notice:empty { display: none; }
-.finance-page .finance { max-width: none; min-height: 0; padding: 0; }
+.finance-page .finance { max-width: none; }
+.finance-page .finance,
+.finance-page .finance section { min-height: 0; padding: 0; }
 .finance-page .finance-tabs {
     align-items: stretch;
     backdrop-filter: none;
