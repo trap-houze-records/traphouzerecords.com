@@ -7,8 +7,8 @@
     "instagram": "https://instagram.com/traphouzerecords",
     "instagramHandle": "@traphouzerecords",
     "whatsapp": "351910734914",
-    "bookingUrl": "https://traphouzerecords.com/booking.html",
-    "hours": "Todos os dias, mediante disponibilidade"
+    "bookingUrl": "https://tidycal.com/traphouzerecords",
+    "hours": "Segunda a Sábado, 10h–22h"
   },
   "navigation": [
     {
@@ -264,6 +264,20 @@
       "showLinks": true
     },
     {
+      "name": "clxro",
+      "genre": "",
+      "image": "images/artists/clxro-1794319581223-eddb906c.jpg",
+      "bio": "",
+      "instagram": "",
+      "youtube": "",
+      "spotify": "",
+      "appleMusic": "",
+      "spotifyPlaylist": "",
+      "clientId": "",
+      "showBio": true,
+      "showLinks": true
+    },
+    {
       "name": "dznn",
       "genre": "",
       "image": "",
@@ -292,6 +306,20 @@
       "showLinks": true
     },
     {
+      "name": "Sheka",
+      "genre": "",
+      "image": "images/artists/sheka-1794319597939-96c8f888.jpg",
+      "bio": "",
+      "instagram": "",
+      "youtube": "",
+      "spotify": "",
+      "appleMusic": "",
+      "spotifyPlaylist": "",
+      "clientId": "",
+      "showBio": true,
+      "showLinks": true
+    },
+    {
       "name": "Reis",
       "genre": "",
       "image": "images/artists/reis-1794319570694-80a5264d.jpg",
@@ -307,34 +335,6 @@
     },
     {
       "name": "Tinx",
-      "genre": "",
-      "image": "images/artists/tinx-1794320372422-7cfdf514.jpg",
-      "bio": "",
-      "instagram": "",
-      "youtube": "",
-      "spotify": "",
-      "appleMusic": "",
-      "spotifyPlaylist": "",
-      "clientId": "",
-      "showBio": true,
-      "showLinks": true
-    },
-    {
-      "name": "clxro",
-      "genre": "",
-      "image": "images/artists/clxro-1794319581223-eddb906c.jpg",
-      "bio": "",
-      "instagram": "",
-      "youtube": "",
-      "spotify": "",
-      "appleMusic": "",
-      "spotifyPlaylist": "",
-      "clientId": "",
-      "showBio": true,
-      "showLinks": true
-    },
-    {
-      "name": "Rex",
       "genre": "",
       "image": "",
       "bio": "",
@@ -376,9 +376,9 @@
       "showLinks": true
     },
     {
-      "name": "Sheka",
+      "name": "Rex",
       "genre": "",
-      "image": "images/artists/sheka-1794319597939-96c8f888.jpg",
+      "image": "",
       "bio": "",
       "instagram": "",
       "youtube": "",
