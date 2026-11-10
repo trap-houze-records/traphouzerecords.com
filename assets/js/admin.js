@@ -3,9 +3,11 @@ let contentLoaded = false;
 let artistClientAccounts = [];
 let activeTab = 'site';
 const requestedModule = new URLSearchParams(location.search).get('section');
-let activeModule = ['clients', 'schedule', 'finance'].includes(requestedModule) ? requestedModule : (sessionStorage.getItem('th_admin_requested_module') || 'dashboard');
+const storedModule = sessionStorage.getItem('th_admin_requested_module') || '';
+let activeModule = ['clients', 'schedule'].includes(requestedModule) ? requestedModule : (['dashboard', 'site', 'schedule', 'clients'].includes(storedModule) ? storedModule : 'dashboard');
 let csrfToken = '';
 let sessionToken = sessionStorage.getItem('th_cms_session') || '';
+const artistImagePreviews = new Map();
 const apiBase = (window.CMS_API_URL || '').replace(/\/$/, '');
 const isLocalPreview = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
 const tabs = [['site', 'Identidade'], ['menu', 'Menu'], ['hero', 'Destaques'], ['services', 'Serviços'], ['equipment', 'Equipamento'], ['about', 'Quem somos'], ['artists', 'Artistas'], ['reviews', 'Avaliações']];
@@ -19,7 +21,7 @@ const editorMeta = {
   artists: ['Artistas', 'Gere os artistas ou colaboradores apresentados no site.'],
   reviews: ['Avaliações', 'Edita os testemunhos que reforçam a confiança no estúdio.']
 };
-const modules = [['dashboard', 'Dashboard'], ['site', 'Editar site'], ['schedule', 'Agenda'], ['clients', 'Clientes'], ['finance', 'Finanças']];
+const modules = [['dashboard', 'Dashboard'], ['site', 'Editar site'], ['schedule', 'Agenda'], ['clients', 'Clientes']];
 const $ = selector => document.querySelector(selector);
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const field = (label, path, value, type = 'text') => `<label class="admin-field"><span>${label}</span>${type === 'textarea' ? `<textarea data-bind="${path}" rows="4">${escapeHtml(value || '')}</textarea>` : `<input type="${type}" data-bind="${path}" value="${escapeHtml(value || '')}">`}</label>`;
@@ -65,7 +67,7 @@ function renderEquipment() { return `<section>${listCards('equipment', (item, in
 function renderAbout() { const about = draft.about; return `<section class="admin-grid">${card('Texto', `${field('Título', 'about.title', about.title)}${field('Parágrafos (um por linha)', 'about.paragraphs', about.paragraphs.join('\n'), 'textarea')}${field('Imagem (URL)', 'about.image', about.image)}`)}${card('Indicadores', about.stats.map((stat, index) => `<div class="admin-row">${field('Número', `about.stats.${index}.value`, stat.value)}${field('Descrição', `about.stats.${index}.label`, stat.label)}</div>`).join(''))}</section>`; }
 function artistPlatformUrl(item, property, legacyLabel) { return item[property] || (item.links || []).find(link => String(link.label || '').trim().toLowerCase() === legacyLabel.toLowerCase())?.url || ''; }
 function artistPlaylistUrl(item) { return item.spotifyPlaylist || (item.catalog || []).find(entry => /spotify/i.test(entry.type || '') || /open\.spotify\.com\/playlist/i.test(entry.url || ''))?.url || ''; }
-function artistImageField(item, index) { return `<label class="admin-field artist-image-field"><span>Imagem do artista</span><input type="file" accept="image/jpeg,image/png,image/webp,image/avif" data-artist-image="${index}"><small>${item.image ? 'Imagem guardada no site. Escolha outro ficheiro para substituir.' : 'JPG, PNG, WebP ou AVIF · máximo 5 MB'}</small>${item.image ? `<img src="${escapeHtml(item.image)}" alt="Pré-visualização de ${escapeHtml(item.name || 'artista')}">` : ''}</label>`; }
+function artistImageField(item, index) { const preview = artistImagePreviews.get(item.image) || item.image; return `<label class="admin-field artist-image-field"><span>Imagem do artista</span><input type="file" accept="image/jpeg,image/png,image/webp,image/avif" data-artist-image="${index}"><small>${item.image ? 'Imagem guardada no site. Escolha outro ficheiro para substituir.' : 'JPG, PNG, WebP ou AVIF · máximo 5 MB'}</small>${preview ? `<img src="${escapeHtml(preview)}" alt="Pré-visualização de ${escapeHtml(item.name || 'artista')}">` : ''}</label>`; }
 function artistClientField(item, index) {
   const accounts = artistClientAccounts.map(client => `<option value="${escapeHtml(client.id)}" ${client.id === item.clientId ? 'selected' : ''}>${escapeHtml(client.name)}${client.active ? '' : ' · pausado'}</option>`).join('');
   return `<label class="admin-field"><span>Conta associada</span><select data-bind="artists.${index}.clientId"><option value="">Sem associação à Área do Artista</option>${accounts}</select><small>Quando publicares, esta conta poderá atualizar fotografia, biografia e links. O catálogo continua gerido aqui.</small></label>`;
@@ -124,13 +126,13 @@ async function refreshSession() {
 }
 
 function renderModules() {
-  $('#adminModules').innerHTML = `<span class="admin-nav-label">Áreas</span>${modules.map(([id, label]) => `<button class="admin-module ${id === activeModule ? 'active' : ''}" data-module="${id}">${label}</button>`).join('')}`;
+  $('#adminModules').innerHTML = `<span class="admin-nav-label">Áreas</span>${modules.map(([id, label]) => `<button class="admin-module ${id === activeModule ? 'active' : ''}" data-module="${id}">${label}</button>`).join('')}<a class="admin-module admin-module-link" href="financas.html">Finanças <span aria-hidden="true">↗</span></a>`;
   $('#adminModules').scrollLeft = 0;
 }
 function renderDashboard() {
   $('#adminTabs').hidden = true;
   $('#publishButton').hidden = true;
-  $('#adminContent').innerHTML = `<section class="studio-dashboard studio-dashboard-practical"><header class="dashboard-overview"><div><p class="eyebrow">Visão operacional</p><h2>Hoje no estúdio</h2><p>Vê o que exige atenção e avança diretamente para a área certa.</p></div><button type="button" class="dashboard-primary-action" data-module="schedule"><span>+</span> Nova marcação</button></header><div class="studio-stats dashboard-stats"><article><span>Clientes ativos</span><strong>—</strong><small>na Área do Artista</small></article><article><span>Recebido este mês</span><strong>—</strong><small>pagamentos confirmados</small></article><article><span>Ocupação do mês</span><strong>—</strong><small>sessões registadas</small></article><article><span>Por receber</span><strong>—</strong><small>valores pendentes este mês</small></article></div><div class="dashboard-priority-grid"><section class="studio-panel dashboard-sessions-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Agenda</p><h3>Próximas sessões</h3></div><button type="button" class="client-link" data-module="schedule">Ver agenda</button></div><div id="dashboardUpcoming" class="dashboard-session-list"><p class="admin-hint">A carregar sessões…</p></div></section><section class="studio-panel dashboard-actions-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Ações rápidas</p><h3>Gerir o estúdio</h3></div></div><div class="dashboard-quick-actions"><button type="button" class="dashboard-quick-action" data-module="clients"><span>Clientes</span><small>Contas, músicas e reservas</small><b>→</b></button><button type="button" class="dashboard-quick-action" data-module="finance"><span>Finanças</span><small>Pagamentos e valores pendentes</small><b>→</b></button><button type="button" class="dashboard-quick-action" data-module="site"><span>Editar site</span><small>Conteúdos e publicação</small><b>→</b></button></div></section></div><section class="studio-panel dashboard-activity-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Registo recente</p><h3>Últimas operações</h3></div></div><div id="dashboardActivity" class="dashboard-activity-list"><p class="admin-hint">A carregar atividade…</p></div></section></section>`;
+  $('#adminContent').innerHTML = `<section class="studio-dashboard studio-dashboard-practical"><header class="dashboard-overview"><div><p class="eyebrow">Visão operacional</p><h2>Hoje no estúdio</h2><p>Vê o que exige atenção e avança diretamente para a área certa.</p></div><button type="button" class="dashboard-primary-action" data-module="schedule"><span>+</span> Nova marcação</button></header><div class="studio-stats dashboard-stats"><article><span>Clientes ativos</span><strong>—</strong><small>na Área do Artista</small></article><article><span>Recebido este mês</span><strong>—</strong><small>pagamentos confirmados</small></article><article><span>Ocupação do mês</span><strong>—</strong><small>sessões registadas</small></article><article><span>Por receber</span><strong>—</strong><small>valores pendentes este mês</small></article></div><div class="dashboard-priority-grid"><section class="studio-panel dashboard-sessions-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Agenda</p><h3>Próximas sessões</h3></div><button type="button" class="client-link" data-module="schedule">Ver agenda</button></div><div id="dashboardUpcoming" class="dashboard-session-list"><p class="admin-hint">A carregar sessões…</p></div></section><section class="studio-panel dashboard-actions-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Ações rápidas</p><h3>Gerir o estúdio</h3></div></div><div class="dashboard-quick-actions"><button type="button" class="dashboard-quick-action" data-module="clients"><span>Clientes</span><small>Contas, músicas e reservas</small><b>→</b></button><a class="dashboard-quick-action" href="financas.html"><span>Finanças</span><small>Pagamentos e valores pendentes</small><b>↗</b></a><button type="button" class="dashboard-quick-action" data-module="site"><span>Editar site</span><small>Conteúdos e publicação</small><b>→</b></button></div></section></div><section class="studio-panel dashboard-activity-panel"><div class="studio-panel-heading"><div><p class="eyebrow">Registo recente</p><h3>Últimas operações</h3></div></div><div id="dashboardActivity" class="dashboard-activity-list"><p class="admin-hint">A carregar atividade…</p></div></section></section>`;
   fetch(`${apiBase}/dashboard/summary`, { headers: { Authorization: `Bearer ${sessionToken}` } }).then(response => response.ok ? response.json() : null).then(result => {
     if (!result) return;
     const euro = cents => (Number(cents || 0) / 100).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
@@ -179,29 +181,14 @@ async function loadArtistClientAccounts() {
     artistClientAccounts = (await response.json()).clients || [];
   } catch { /* O editor continua disponível se a lista de contas não puder ser carregada. */ }
 }
-function renderFinance() {
-  $('#adminTabs').hidden = true;
-  $('#publishButton').hidden = true;
-  $('#adminContent').innerHTML = '<div id="financeModuleRoot"></div>';
-  window.FinanceModule.mount($('#financeModuleRoot'), { apiBase, getToken: () => sessionToken, bookingServices: draft?.bookingServices || bookingServiceDefaults, mixMasterServices: draft?.mixMasterServices || mixMasterServiceDefaults, saveServices: async (services, mixServices) => {
-    if (!draft) { const response = await fetch(`${apiBase}/content`, { cache: 'no-store' }); if (!response.ok) throw new Error('Não foi possível carregar a configuração de preços.'); draft = await response.json(); }
-    draft.bookingServices = services;
-    draft.mixMasterServices = mixServices;
-    const response = await fetch(`${apiBase}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CMS-CSRF': csrfToken, Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ content: draft }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Não foi possível guardar os preços.');
-    notice(`Preços publicados. Commit ${result.commit.slice(0, 7)}.`, 'success');
-  }, onError: error => notice(error.message, 'error'), onNotice: notice }).catch(error => notice(error.message, 'error'));
-}
 function selectModule(module) {
   activeModule = module;
   sessionStorage.setItem('th_admin_requested_module', module);
-  history.replaceState(null, '', `${['clients', 'schedule', 'finance'].includes(module) ? `${location.pathname}?section=${module}` : location.pathname}`);
+  history.replaceState(null, '', `${['clients', 'schedule'].includes(module) ? `${location.pathname}?section=${module}` : location.pathname}`);
   renderModules();
   if (module === 'dashboard') return renderDashboard();
   if (module === 'clients') return renderClients();
   if (module === 'schedule') return renderSchedule();
-  if (module === 'finance') return renderFinance();
   $('#adminTabs').hidden = false;
   $('#publishButton').hidden = isLocalPreview;
   if (contentLoaded) return renderTab();
@@ -235,6 +222,7 @@ async function uploadArtistImage(input) {
   const form = new FormData();
   form.append('image', file);
   form.append('artist', draft.artists[index].name || 'artista');
+  const localPreview = URL.createObjectURL(file);
   input.disabled = true;
   notice('A enviar imagem…');
   try {
@@ -242,12 +230,17 @@ async function uploadArtistImage(input) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Não foi possível enviar a imagem.');
     draft.artists[index].image = result.path;
+    artistImagePreviews.set(result.path, localPreview);
     notice('Imagem guardada. Carregue em Publicar para a associar ao artista.', 'success');
     renderTab();
+  } catch (error) {
+    URL.revokeObjectURL(localPreview);
+    throw error;
   } finally { input.disabled = false; }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  if (requestedModule === 'finance') { location.replace('financas.html'); return; }
   const tokenMatch = location.hash.match(/(?:^#|&)cms_session=([^&]+)/);
   if (tokenMatch) {
     sessionToken = decodeURIComponent(tokenMatch[1]);

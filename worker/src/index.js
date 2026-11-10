@@ -159,13 +159,15 @@ async function bookingConfiguration(env, id) {
 }
 
 async function login(request, env) {
+  const returnTo = new URL(request.url).searchParams.get('return') === 'financas' ? 'financas' : 'admin';
+  const returnPage = returnTo === 'financas' ? 'financas.html' : 'admin.html';
   // Apenas no Worker local: permite validar a interface sem copiar segredos OAuth.
   if (env.LOCAL_DEV_AUTH === 'true' && new URL(request.url).hostname === '127.0.0.1') {
     const session = await signedValue({ login: 'local-test-admin', csrf: crypto.randomUUID(), exp: Math.floor(Date.now() / 1000) + 60 * 60 }, env);
-    return redirect(`${env.ADMIN_ORIGIN}/admin.html#cms_session=${encodeURIComponent(session)}`);
+    return redirect(`${env.ADMIN_ORIGIN}/${returnPage}#cms_session=${encodeURIComponent(session)}`);
   }
   if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.SESSION_SECRET) return error('O Worker ainda não foi configurado.', 503);
-  const state = await signedValue({ exp: Math.floor(Date.now() / 1000) + 600, nonce: crypto.randomUUID() }, env);
+  const state = await signedValue({ exp: Math.floor(Date.now() / 1000) + 600, nonce: crypto.randomUUID(), returnTo }, env);
   const callback = new URL('/auth/callback', new URL(request.url).origin).toString();
   const url = new URL('https://github.com/login/oauth/authorize');
   url.search = new URLSearchParams({ client_id: env.GITHUB_OAUTH_CLIENT_ID, redirect_uri: callback, scope: 'read:user', state });
@@ -174,7 +176,8 @@ async function login(request, env) {
 async function callback(request, env) {
   const url = new URL(request.url);
   const state = url.searchParams.get('state');
-  if (!state || state !== cookie(request, 'th_oauth_state') || !await readSignedValue(state, env)) return error('O pedido de entrada expirou. Tente novamente.', 401);
+  const statePayload = await readSignedValue(state, env);
+  if (!state || state !== cookie(request, 'th_oauth_state') || !statePayload) return error('O pedido de entrada expirou. Tente novamente.', 401);
   const code = url.searchParams.get('code');
   if (!code) return error('O GitHub não devolveu um código de autorização.', 401);
   const tokenResponse = await fetch('https://github.com/login/oauth/access_token', { method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify({ client_id: env.GITHUB_OAUTH_CLIENT_ID, client_secret: env.GITHUB_OAUTH_CLIENT_SECRET, code }) });
@@ -185,7 +188,8 @@ async function callback(request, env) {
   const allowed = (env.ALLOWED_GITHUB_USERS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
   if (!allowed.includes(loginName.toLowerCase())) return error('Este utilizador não está autorizado a publicar.', 403);
   const session = await signedValue({ login: loginName, csrf: crypto.randomUUID(), exp: Math.floor(Date.now() / 1000) + 60 * 60 }, env);
-  return redirect(`${env.ADMIN_ORIGIN}/admin.html#cms_session=${encodeURIComponent(session)}`);
+  const returnPage = statePayload.returnTo === 'financas' ? 'financas.html' : 'admin.html';
+  return redirect(`${env.ADMIN_ORIGIN}/${returnPage}#cms_session=${encodeURIComponent(session)}`);
 }
 async function session(request, env) {
   const value = await sessionFromRequest(request, env);
@@ -824,14 +828,14 @@ async function financeSummary(request, env) {
   if (!admin) return error('Pedido de administração não autorizado.', 403);
   const db = clientDb(env);
   const records = await db.prepare(`
-    SELECT t.id, t.client_id AS clientId, c.display_name AS clientName, 'track' AS type, t.title AS description, t.stage, CASE WHEN t.paid_cents >= t.amount_cents THEN 'paid' WHEN t.paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, t.amount_cents AS amountCents, t.paid_cents AS paidCents, t.payment_url AS paymentUrl, t.created_at AS createdAt
+    SELECT t.id, t.client_id AS clientId, c.display_name AS clientName, 'track' AS type, t.title AS description, t.stage, CASE WHEN t.paid_cents >= t.amount_cents THEN 'paid' WHEN t.paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, t.amount_cents AS amountCents, t.paid_cents AS paidCents, t.payment_url AS paymentUrl, t.created_at AS createdAt, NULL AS endsAt
     FROM client_tracks t JOIN clients c ON c.id = t.client_id
     UNION ALL
-    SELECT a.id, COALESCE(a.client_id, 'guest:' || a.id) AS clientId, COALESCE(c.display_name, a.guest_name, 'Cliente') AS clientName, 'appointment' AS type, a.service AS description, NULL AS stage, CASE WHEN a.paid_cents >= a.amount_cents THEN 'paid' WHEN a.paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, a.amount_cents AS amountCents, a.paid_cents AS paidCents, a.payment_url AS paymentUrl, a.starts_at AS createdAt
+    SELECT a.id, COALESCE(a.client_id, 'guest:' || a.id) AS clientId, COALESCE(c.display_name, a.guest_name, 'Cliente') AS clientName, 'appointment' AS type, a.service AS description, NULL AS stage, CASE WHEN a.paid_cents >= a.amount_cents THEN 'paid' WHEN a.paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, a.amount_cents AS amountCents, a.paid_cents AS paidCents, a.payment_url AS paymentUrl, a.starts_at AS createdAt, a.ends_at AS endsAt
     FROM studio_appointments a LEFT JOIN clients c ON c.id = a.client_id
     WHERE a.status != 'cancelled'
     UNION ALL
-    SELECT b.id, b.client_id AS clientId, c.display_name AS clientName, 'booking' AS type, b.service AS description, NULL AS stage, CASE WHEN b.paid_cents >= b.amount_cents THEN 'paid' WHEN b.paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, b.amount_cents AS amountCents, b.paid_cents AS paidCents, b.payment_url AS paymentUrl, COALESCE(b.starts_at, b.created_at) AS createdAt
+    SELECT b.id, b.client_id AS clientId, c.display_name AS clientName, 'booking' AS type, b.service AS description, NULL AS stage, CASE WHEN b.paid_cents >= b.amount_cents THEN 'paid' WHEN b.paid_cents > 0 THEN 'partial' ELSE 'pending' END AS paymentStatus, b.amount_cents AS amountCents, b.paid_cents AS paidCents, b.payment_url AS paymentUrl, COALESCE(b.starts_at, b.created_at) AS createdAt, NULL AS endsAt
     FROM client_bookings b JOIN clients c ON c.id = b.client_id
     WHERE b.appointment_id IS NULL
     ORDER BY createdAt DESC

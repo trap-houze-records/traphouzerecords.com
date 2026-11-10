@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#050505">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Trap Houze Finanças">
+  <title>Finanças · Trap Houze Records</title>
+  <link rel="icon" type="image/png" href="images/Logo.png?v=1">
+  <link rel="apple-touch-icon" sizes="180x180" href="images/admin-apple-touch-icon.png?v=1">
+  <link rel="stylesheet" href="assets/css/style.css?v=28">
+</head>
+<body class="admin-page finance-page">
+  <main class="finance-page-shell">
+    <header class="finance-page-topbar">
+      <a class="finance-page-brand" href="admin.html" aria-label="Voltar ao Admin">
+        <img src="images/Logo.png" alt="Trap Houze Records">
+        <span><small>Gestão do estúdio</small><strong>Finanças</strong></span>
+      </a>
+      <div class="finance-page-actions">
+        <span id="financeAuthStatus">Acesso protegido</span>
+        <a class="finance-back-link" href="admin.html">← Voltar ao Admin</a>
+        <button id="financeLoginButton" class="btn btn-sm" type="button" hidden>Entrar</button>
+      </div>
+    </header>
+    <div id="financeNotice" class="admin-notice" role="status"></div>
+    <section id="financeLoginGate" class="finance-login-gate" hidden>
+      <p class="eyebrow">Área protegida</p>
+      <h1>Finanças</h1>
+      <p>Inicie sessão com a conta autorizada para consultar e gerir os dados financeiros.</p>
+      <button class="btn" type="button" data-finance-login>Entrar</button>
+    </section>
+    <div id="financePageRoot" hidden></div>
+  </main>
+  <script>window.CMS_API_URL = window.CMS_API_URL || '';</script>
+  <script src="assets/js/admin-config.js?v=1" onerror="this.remove()"></script>
+  <script src="assets/js/admin-local-config.js" onerror="this.remove()"></script>
+  <script src="assets/js/admin-finance.js?v=8"></script>
+  <script src="assets/js/finance-page.js?v=1" defer></script>
+</body>
+</html>

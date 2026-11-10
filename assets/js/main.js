@@ -7,6 +7,11 @@ const safeUrl = value => {
   if (/^(?:\.\/)?images\/[a-zA-Z0-9_./-]+$/.test(raw)) return raw.replace(/^\.\//, '');
   try { const url = new URL(raw); return ['https:', 'http:'].includes(url.protocol) ? url.toString() : ''; } catch { return ''; }
 };
+const artistImageUrl = value => {
+  const url = safeUrl(value) || 'images/Logo.png';
+  return /^images\/artists\//i.test(url) ? `${url}?v=artist-media-1` : url;
+};
+const artistImage = (artist, className) => `<img class="${className}" src="${escapeHtml(artistImageUrl(artist.image))}" alt="${escapeHtml(artist.name)}" onerror="this.onerror=null;this.src='images/Logo.png'">`;
 const artistPlatforms = [['Instagram', 'instagram'], ['YouTube', 'youtube'], ['Spotify', 'spotify'], ['Apple Music', 'applemusic']];
 const publicApiBase = String(window.CMS_API_URL || '').replace(/\/$/, '');
 const spotifyPlaylistEmbed = value => {
@@ -46,7 +51,7 @@ function renderAbout() {
 
 function renderArtists() {
   if (!sectionVisible('artists') || !content.artists.length) return '';
-  return `<section id="artists" class="artists"><h2 class="section-title">Artistas</h2><div class="artists-grid">${content.artists.map((artist, index) => `<button type="button" class="artist-item" data-artist="${index}" aria-label="Ver perfil de ${escapeHtml(artist.name)}"><img class="artist-item-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div class="artist-item-name"><h4>${escapeHtml(artist.name)}</h4><p>${escapeHtml(String(artist.genre || 'Artista').trim() || 'Artista')}</p><span>Ver perfil →</span></div></button>`).join('')}</div></section>`;
+  return `<section id="artists" class="artists"><h2 class="section-title">Artistas</h2><div class="artists-grid">${content.artists.map((artist, index) => `<button type="button" class="artist-item" data-artist="${index}" aria-label="Ver perfil de ${escapeHtml(artist.name)}">${artistImage(artist, 'artist-item-image')}<div class="artist-item-name"><h4>${escapeHtml(artist.name)}</h4><p>${escapeHtml(String(artist.genre || 'Artista').trim() || 'Artista')}</p><span>Ver perfil →</span></div></button>`).join('')}</div></section>`;
 }
 
 function renderReviews() {
@@ -109,8 +114,8 @@ function showArtist(index) {
     ? `<article class="artist-catalog-playlist"><iframe src="${escapeHtml(playlist)}" title="Catálogo Trap Houze Records: ${escapeHtml(artist.name)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></article>`
     : '<p>O catálogo deste artista será disponibilizado em breve.</p>';
   const profileMarkup = showBio
-    ? `<section class="artist-modal-profile${biography ? '' : ' artist-modal-profile-pending'}"><img class="artist-modal-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"><div class="artist-modal-copy"><p class="artist-modal-genre">${escapeHtml(artist.genre || 'Artista Trap Houze Records')}</p><p class="artist-modal-bio">${escapeHtml(biography || 'No bio yet')}</p></div></section>`
-    : `<section class="artist-modal-profile artist-modal-profile-compact"><img class="artist-modal-image" src="${escapeHtml(safeUrl(artist.image) || 'images/Logo.png')}" alt="${escapeHtml(artist.name)}"></section>`;
+    ? `<section class="artist-modal-profile${biography ? '' : ' artist-modal-profile-pending'}">${artistImage(artist, 'artist-modal-image')}<div class="artist-modal-copy"><p class="artist-modal-genre">${escapeHtml(artist.genre || 'Artista Trap Houze Records')}</p><p class="artist-modal-bio">${escapeHtml(biography || 'No bio yet')}</p></div></section>`
+    : `<section class="artist-modal-profile artist-modal-profile-compact">${artistImage(artist, 'artist-modal-image')}</section>`;
   const linksMarkup = showLinks ? `<section class="artist-modal-section artist-links-section"><h4>Ouvir e seguir</h4><div class="artist-links">${platformLinks}</div></section>` : '';
   document.getElementById('artistModalTitle').textContent = artist.name;
   document.getElementById('artistModalBody').innerHTML = `${profileMarkup}<section class="artist-modal-section artist-catalog-section"><h4>Catálogo - Trap Houze Records</h4><div class="artist-catalog">${catalogMarkup}</div></section>${linksMarkup}`;
