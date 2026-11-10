@@ -1290,6 +1290,8 @@ footer p {
 .track-player-versions button { background: rgba(255,255,255,.06); border: 1px solid transparent; color: rgba(255,255,255,.66); cursor: pointer; font: inherit; font-size: .75rem; min-width: 45px; padding: 7px 10px; }
 .track-player-versions button:hover { border-color: rgba(22,199,243,.55); color: #fff; }
 .track-player-versions button.active { background: #16c7f3; border-color: #16c7f3; color: #06131b; font-weight: 700; }
+.track-recording-submit-only { display: flex; justify-content: flex-end; border-top: 1px solid rgba(255,255,255,.1); margin-top: 14px; padding-top: 14px; }
+.track-recording-submit-only .track-submission { flex: 1 1 100%; }
 .track-player-controls { align-items: center; display: grid; gap: 10px; grid-template-columns: auto auto minmax(80px, 1fr) auto; }
 .track-player-toggle { align-items: center; background: #16c7f3; border: 1px solid #16c7f3; border-radius: 50%; color: #06131b; cursor: pointer; display: inline-flex; height: 38px; justify-content: center; min-width: 38px; padding: 0; width: 38px; }
 .track-player-toggle::before { border-bottom: 7px solid transparent; border-left: 11px solid currentColor; border-top: 7px solid transparent; content: ""; height: 0; margin-left: 3px; width: 0; }

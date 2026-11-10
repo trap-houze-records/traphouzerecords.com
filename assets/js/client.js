@@ -15,6 +15,9 @@ let musicTab = 'mix-master';
 let submittingTrack = null;
 const trackAudioUrls = new Map();
 const openTrackComments = new Set();
+// Ocultação provisória na Zona do Artista. Os dados e a gestão no Admin mantêm-se intactos.
+const playerUiEnabled = false;
+const versionAndCommentUiEnabled = false;
 const apiBase = (window.CLIENT_PORTAL_API_URL || window.CMS_API_URL || '').replace(/\/$/, '');
 const usesLocalPortalApi = /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(apiBase);
 const clientTokenKey = 'th_client_portal_token';
@@ -96,12 +99,10 @@ function renderTrackPlayer(track, versions) {
   const active = versions[0];
   return `<section class="track-player" data-track-player="${escapeHtml(track.id)}">
     <div class="track-player-heading">
-      <div class="track-player-identity"><img src="/images/Logo.png" alt=""><div><span>Trap Houze Player</span><strong data-player-filename>${escapeHtml(active.originalName || track.title)}</strong><small data-player-filemeta>${escapeHtml(active.label)} · ${versionFileSize(active.sizeBytes)}</small></div></div>
+      <div class="track-player-identity"><img src="/images/Logo.png" alt=""><div><span>Trap Houze Player</span><strong data-player-filename>${escapeHtml(active.originalName || track.title)}</strong><small data-player-filemeta>${versionAndCommentUiEnabled ? `${escapeHtml(active.label)} · ` : ''}${versionFileSize(active.sizeBytes)}</small></div></div>
       <div class="track-player-actions">${track.category === 'recording' && submittingTrack !== track.id ? `<button type="button" class="track-player-submit" data-submit-recording="${escapeHtml(track.id)}">Submeter para Mix & Master</button>` : ''}<button type="button" class="track-player-download" data-download-version="${escapeHtml(active.id)}" data-track-id="${escapeHtml(track.id)}">Descarregar</button></div>
     </div>
-    <div class="track-player-versions" role="tablist" aria-label="Versões de ${escapeHtml(track.title)}">
-      ${versions.map((version, index) => `<button type="button" role="tab" aria-selected="${index === 0 ? 'true' : 'false'}" class="${index === 0 ? 'active' : ''}" data-player-version="${escapeHtml(version.id)}" data-track-id="${escapeHtml(track.id)}" data-version-label="${escapeHtml(version.label)}" data-version-name="${escapeHtml(version.originalName || track.title)}" data-version-size="${escapeHtml(versionFileSize(version.sizeBytes))}">${escapeHtml(version.label)}</button>`).join('')}
-    </div>
+    ${versionAndCommentUiEnabled ? `<div class="track-player-versions" role="tablist" aria-label="Versões de ${escapeHtml(track.title)}">${versions.map((version, index) => `<button type="button" role="tab" aria-selected="${index === 0 ? 'true' : 'false'}" class="${index === 0 ? 'active' : ''}" data-player-version="${escapeHtml(version.id)}" data-track-id="${escapeHtml(track.id)}" data-version-label="${escapeHtml(version.label)}" data-version-name="${escapeHtml(version.originalName || track.title)}" data-version-size="${escapeHtml(versionFileSize(version.sizeBytes))}">${escapeHtml(version.label)}</button>`).join('')}</div>` : `<button type="button" hidden aria-hidden="true" tabindex="-1" class="active" data-player-version="${escapeHtml(active.id)}" data-track-id="${escapeHtml(track.id)}" data-version-label="${escapeHtml(active.label)}" data-version-name="${escapeHtml(active.originalName || track.title)}" data-version-size="${escapeHtml(versionFileSize(active.sizeBytes))}"></button>`}
     <audio preload="metadata" data-track-audio="${escapeHtml(track.id)}" data-version-audio="${escapeHtml(active.id)}"></audio>
     <div class="track-player-controls">
       <button type="button" class="track-player-toggle" data-player-toggle aria-label="Reproduzir" title="Reproduzir"></button>
@@ -109,7 +110,7 @@ function renderTrackPlayer(track, versions) {
       <input type="range" min="0" max="1000" value="0" step="1" aria-label="Posição na música" data-player-progress>
       <span data-player-duration>--:--</span>
     </div>
-    <div class="track-player-foot"><span data-player-status>A preparar áudio…</span><span>${versions.length} ${versions.length === 1 ? 'versão' : 'versões'}</span></div>
+    <div class="track-player-foot"><span data-player-status>A preparar áudio…</span>${versionAndCommentUiEnabled ? `<span>${versions.length} ${versions.length === 1 ? 'versão' : 'versões'}</span>` : ''}</div>
     ${track.category === 'recording' && submittingTrack === track.id ? trackSubmissionForm(track) : ''}
   </section>`;
 }
@@ -127,6 +128,7 @@ function renderTrack(track) {
   const initialComments = comments.filter(comment => (comment.versionId || initialVersionId) === initialVersionId);
   const versionLabels = new Map(versions.map(version => [version.id, version.label]));
   const commentsOpen = openTrackComments.has(track.id);
+  const recordingSubmission = !playerUiEnabled && track.category === 'recording' && versions.length ? `<div class="track-recording-submit-only">${submittingTrack !== track.id ? `<button type="button" class="track-player-submit" data-submit-recording="${escapeHtml(track.id)}">Submeter para Mix & Master</button>` : trackSubmissionForm(track)}</div>` : '';
   const commentsPanel = `<div class="track-workspace track-comments" data-track-comments ${commentsOpen ? '' : 'hidden'}><div class="track-workspace-heading"><strong>Comentários da versão</strong><span data-comment-count>${initialComments.length}</span></div><div data-track-comment-list>${comments.map(comment => {
     const versionId = comment.versionId || initialVersionId;
     const visible = versionId === initialVersionId;
@@ -136,8 +138,8 @@ function renderTrack(track) {
   return `<article class="track-card">
     <div class="track-heading"><p class="eyebrow">${trackServiceLabel(track)}</p><h2>${escapeHtml(track.title)}</h2></div>
     ${stagesPanel}
-    ${renderTrackPlayer(track, versions)}
-    ${track.category === 'recording' ? '' : `<button type="button" class="track-comments-toggle" data-toggle-track-comments="${escapeHtml(track.id)}" aria-expanded="${commentsOpen ? 'true' : 'false'}">Comentários <span>${comments.length}</span></button>${commentsPanel}`}
+    ${playerUiEnabled ? renderTrackPlayer(track, versions) : recordingSubmission}
+    ${playerUiEnabled && versionAndCommentUiEnabled && track.category !== 'recording' ? `<button type="button" class="track-comments-toggle" data-toggle-track-comments="${escapeHtml(track.id)}" aria-expanded="${commentsOpen ? 'true' : 'false'}">Comentários <span>${comments.length}</span></button>${commentsPanel}` : ''}
     ${track.category === 'recording' ? '' : `<div class="track-payment ${track.paymentStatus}">${paymentLabel(track) ? `<span>${paymentLabel(track)}</span>` : ''}${track.due === 0 ? '<span class="track-payment-mark">✓</span>' : `<button type="button" data-payment-url="${escapeHtml(track.paymentUrl || '')}">Pagar ${money(track.due)}</button>`}</div>`}
   </article>`;
 }
@@ -276,12 +278,12 @@ async function loadTrackVersion(player, versionButton, options = {}) {
   });
   syncTrackComments(player, versionButton);
   player.querySelector('[data-player-filename]').textContent = versionButton.dataset.versionName || '';
-  player.querySelector('[data-player-filemeta]').textContent = `${versionButton.dataset.versionLabel || ''} · ${versionButton.dataset.versionSize || ''}`;
+  player.querySelector('[data-player-filemeta]').textContent = versionAndCommentUiEnabled ? `${versionButton.dataset.versionLabel || ''} · ${versionButton.dataset.versionSize || ''}` : (versionButton.dataset.versionSize || '');
   const download = player.querySelector('[data-download-version]');
   download.dataset.downloadVersion = versionId;
   download.dataset.trackId = trackId;
   const status = player.querySelector('[data-player-status]');
-  status.textContent = 'A carregar versão…';
+  status.textContent = 'A carregar áudio…';
   setTrackPlayerState(player, false);
   audio.pause();
   audio.removeAttribute('src');
@@ -296,7 +298,7 @@ async function loadTrackVersion(player, versionButton, options = {}) {
     audio.dataset.versionAudio = versionId;
     audio.src = url;
     audio.load();
-    status.textContent = versionButton.dataset.versionName || 'Versão pronta';
+    status.textContent = versionButton.dataset.versionName || 'Áudio pronto';
     if (seekSeconds !== null) {
       await new Promise(resolve => {
         const seek = () => { audio.currentTime = Math.min(Number(seekSeconds || 0), Number.isFinite(audio.duration) ? audio.duration : Number(seekSeconds || 0)); resolve(); };
@@ -307,7 +309,7 @@ async function loadTrackVersion(player, versionButton, options = {}) {
     }
     if (autoplay) await audio.play();
   } catch (error) {
-    if (player.dataset.playerRequest === requestId) status.textContent = error.message || 'Não foi possível carregar esta versão.';
+    if (player.dataset.playerRequest === requestId) status.textContent = error.message || 'Não foi possível carregar este áudio.';
   }
 }
 function bindTrackPlayer(player) {
