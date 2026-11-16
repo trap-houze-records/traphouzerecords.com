@@ -157,6 +157,7 @@ async function bookingConfiguration(env, id) {
   const schedule = bookingScheduleFromContent(content);
   return { service, rules: schedule.serviceRules[service.id] || defaultBookingAvailability, blocks: schedule.blocks };
 }
+function bookingServiceUsesEngineer(service) { return String(service?.id || '') !== 'studio-rental'; }
 
 async function login(request, env) {
   const returnTo = new URL(request.url).searchParams.get('return') === 'financas' ? 'financas' : 'admin';
@@ -563,6 +564,7 @@ async function clientAppointment(request, env, appointmentId) {
   if (schedule.blocks.some(item => startsAt < bookingDateTime(item.date, item.endsAt) && endsAt > bookingDateTime(item.date, item.startsAt))) return error('Este período está bloqueado pelo estúdio.', 409);
   const appointment = { ...current, startsAt, endsAt, status: 'pending', notes: String(body.notes || current.notes || '').trim().slice(0, 2000) || null };
   if (await hasAppointmentConflict(db, appointment, appointmentId)) return error('Este horário já não está disponível. Escolha outro, por favor.', 409);
+  if (bookingServiceUsesEngineer(matchedService) && await hasGoogleBusyConflict(env, startsAt, endsAt, current.googleEventId)) return error('O engenheiro não está disponível neste horário. Escolha outro, por favor.', 409);
   await db.batch([
     db.prepare("UPDATE studio_appointments SET starts_at = ?, ends_at = ?, status = 'pending', notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(startsAt, endsAt, appointment.notes, appointmentId),
     db.prepare('INSERT INTO client_audit_log (id, client_id, actor, action, metadata_json) VALUES (?, ?, ?, ?, ?)').bind(randomId(), session.clientId, `client:${session.clientId}`, 'booking.rescheduled', JSON.stringify({ appointmentId, startsAt, endsAt }))
@@ -915,13 +917,23 @@ async function googleBusyEvents(env, from, until) {
   if (!connection?.calendarId) return [];
   const fromDay = String(from).slice(0, 10);
   const untilDay = String(until).slice(0, 10);
-  const query = new URLSearchParams({ timeMin: new Date(`${fromDay}T00:00:00+01:00`).toISOString(), timeMax: new Date(`${untilDay}T00:00:00+01:00`).toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500' });
+  const query = new URLSearchParams({ timeMin: lisbonInstant(`${fromDay} 00:00`).toISOString(), timeMax: lisbonInstant(`${untilDay} 00:00`).toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500' });
   const { payload } = await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events?${query}`);
-  return (payload.items || []).filter(item => item.status !== 'cancelled' && item.transparency !== 'transparent' && item.start?.dateTime && item.end?.dateTime).map(item => {
-    const startsAt = googleDateTime(item.start.dateTime);
-    const endsAt = googleDateTime(item.end.dateTime);
-    return startsAt && endsAt ? { id: item.id, startsAt, endsAt, title: item.summary || 'Evento Google Calendar' } : null;
+  return (payload.items || []).filter(item => item.status !== 'cancelled' && item.transparency !== 'transparent').map(item => {
+    const allDay = Boolean(item.start?.date && item.end?.date);
+    const startsAt = allDay ? `${item.start.date} 00:00` : googleDateTime(item.start?.dateTime);
+    const endsAt = allDay ? `${item.end.date} 00:00` : googleDateTime(item.end?.dateTime);
+    return startsAt && endsAt ? { id: item.id, startsAt, endsAt, title: item.summary || 'Evento Google Calendar', allDay } : null;
   }).filter(Boolean);
+}
+function nextCalendarDate(value) {
+  const date = new Date(`${String(value || '').slice(0, 10)}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+async function hasGoogleBusyConflict(env, startsAt, endsAt, excludeEventId = '') {
+  const events = await googleBusyEvents(env, String(startsAt).slice(0, 10), nextCalendarDate(endsAt));
+  return events.some(item => item.id !== excludeEventId && item.startsAt < endsAt && item.endsAt > startsAt);
 }
 async function googleSyncAppointment(env, db, appointment) {
   let connection;
@@ -1098,7 +1110,9 @@ async function publicAvailability(request, env) {
   if (until <= from) throw inputError('Intervalo de disponibilidade inválido.');
   const { service, rules, blocks } = await bookingConfiguration(env, url.searchParams.get('serviceId'));
   const busy = await clientDb(env).prepare("SELECT starts_at AS startsAt, ends_at AS endsAt FROM studio_appointments WHERE status != 'cancelled' AND starts_at < ? AND ends_at > ? ORDER BY starts_at ASC").bind(`${until} 00:00`, `${from} 00:00`).all();
-  const googleBusy = await googleBusyEvents(env, from, until);
+  // Os eventos externos do Google representam a disponibilidade do engenheiro.
+  // O aluguer sem engenheiro só depende da ocupação real do estúdio e dos bloqueios configurados.
+  const googleBusy = bookingServiceUsesEngineer(service) ? await googleBusyEvents(env, from, until) : [];
   const configuredBlocks = blocks.filter(item => item.date >= from && item.date < until).map(item => ({ startsAt: bookingDateTime(item.date, item.startsAt), endsAt: bookingDateTime(item.date, item.endsAt), title: item.label }));
   return jsonResponse({ timezone: 'Europe/Lisbon', serviceId: service.id, rules, busy: [...busy.results, ...googleBusy, ...configuredBlocks] });
 }
@@ -1128,6 +1142,7 @@ async function publicBooking(request, env) {
   const amountCents = Math.round(bookingService.pricePerHour * duration * 100);
   const appointment = { clientId: sessionClient?.id || null, guestName: sessionClient ? null : guestName, guestPhone: null, guestEmail: sessionClient ? null : guestEmail, service, startsAt, endsAt, status: 'pending', amountCents, paidCents: 0, paymentStatus: 'pending', paymentUrl: null, notes };
   if (await hasAppointmentConflict(db, appointment)) return error('Este horário já não está disponível. Escolha outro, por favor.', 409);
+  if (bookingServiceUsesEngineer(bookingService) && await hasGoogleBusyConflict(env, startsAt, endsAt)) return error('O engenheiro não está disponível neste horário. Escolha outro, por favor.', 409);
   const id = randomId();
   const statements = [db.prepare('INSERT INTO studio_appointments (id, client_id, guest_name, guest_phone, guest_email, service, starts_at, ends_at, status, amount_cents, payment_status, payment_url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, appointment.clientId, appointment.guestName, appointment.guestPhone, appointment.guestEmail, appointment.service, appointment.startsAt, appointment.endsAt, appointment.status, appointment.amountCents, appointment.paymentStatus, appointment.paymentUrl, appointment.notes)];
   if (sessionClient) {

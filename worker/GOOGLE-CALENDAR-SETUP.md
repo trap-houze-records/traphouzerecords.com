@@ -22,4 +22,11 @@ O site usa exclusivamente o calendário **Booking**:
 
 Não há nenhuma autenticação OAuth para fazer no painel. A conta de serviço dá acesso somente ao calendário Booking que foi partilhado com ela.
 
-As novas reservas são espelhadas no calendário Booking; eventos criados diretamente nesse calendário bloqueiam disponibilidade no site e aparecem na Agenda do Admin como eventos externos.
+As novas reservas são espelhadas no calendário Booking e aparecem na Agenda do Admin.
+
+## Separação entre sessões e aluguer
+
+- As reservas registadas no site ocupam o estúdio e bloqueiam todos os serviços no mesmo horário.
+- Os eventos externos criados diretamente no calendário Booking representam a disponibilidade do engenheiro e bloqueiam apenas as sessões acompanhadas. São considerados eventos com horário, de dia inteiro e com vários dias.
+- O serviço **Alugar o Estúdio** ignora esses compromissos externos, porque não necessita de engenheiro.
+- Para impedir também o aluguer num período específico, crie uma reserva do estúdio ou um bloqueio específico na Agenda do Admin.
