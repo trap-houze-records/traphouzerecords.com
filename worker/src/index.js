@@ -138,7 +138,7 @@ function bookingScheduleFromContent(content) {
     const lunchIsWithinAvailability = fullDay || (lunchStartsAt < lunchEndsAt && lunchStartsAt >= availableStartsAt && lunchEndsAt <= availableEndsAt);
     return { startsAt: availableStartsAt, endsAt: availableEndsAt, fullDay, lunchStartsAt, lunchEndsAt, lunchEnabled: !fullDay && lunchEnabled && lunchIsWithinAvailability, minNoticeHours: Math.max(0, Math.min(720, Number(source.minNoticeHours ?? defaultBookingAvailability.minNoticeHours) || 0)) };
   };
-  return { serviceRules: Object.fromEntries(bookingServicesFromContent(content).map(item => [item.id, rule(item)])), blocks: blocks.map((item, index) => ({ id: String(item.id || `block-${index + 1}`), date: String(item.date || ''), startsAt: validTime(item.startsAt), endsAt: validTime(item.endsAt), label: String(item.label || 'Bloqueio').trim().slice(0, 120) })).filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.startsAt && item.endsAt && item.endsAt > item.startsAt) };
+  return { blockEngineerSundays: raw.blockEngineerSundays === true, serviceRules: Object.fromEntries(bookingServicesFromContent(content).map(item => [item.id, rule(item)])), blocks: blocks.map((item, index) => ({ id: String(item.id || `block-${index + 1}`), date: String(item.date || ''), startsAt: validTime(item.startsAt), endsAt: validTime(item.endsAt), label: String(item.label || 'Bloqueio').trim().slice(0, 120) })).filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.startsAt && item.endsAt && item.endsAt > item.startsAt) };
 }
 function bookingServicesFromContent(content) {
   const source = Array.isArray(content?.bookingServices) && content.bookingServices.length ? content.bookingServices : defaultBookingServices;
@@ -155,7 +155,8 @@ async function bookingConfiguration(env, id) {
   const service = bookingServicesFromContent(content).find(item => item.id === String(id || ''));
   if (!service || !service.active) throw inputError('Este tipo de reserva não está disponível.');
   const schedule = bookingScheduleFromContent(content);
-  return { service, rules: schedule.serviceRules[service.id] || defaultBookingAvailability, blocks: schedule.blocks };
+  const rules = { ...(schedule.serviceRules[service.id] || defaultBookingAvailability), sundaysBlocked: schedule.blockEngineerSundays && bookingServiceUsesEngineer(service) };
+  return { service, rules, blocks: schedule.blocks };
 }
 function bookingServiceUsesEngineer(service) { return String(service?.id || '') !== 'studio-rental'; }
 
@@ -557,7 +558,7 @@ async function clientAppointment(request, env, appointmentId) {
   const content = (await contentFromGitHub(env)).content;
   const matchedService = bookingServicesFromContent(content).find(item => item.title === current.service);
   const schedule = bookingScheduleFromContent(content);
-  const rules = schedule.serviceRules[matchedService?.id] || defaultBookingAvailability;
+  const rules = { ...(schedule.serviceRules[matchedService?.id] || defaultBookingAvailability), sundaysBlocked: schedule.blockEngineerSundays && bookingServiceUsesEngineer(matchedService) };
   const ruleError = bookingBlockedByRules(startsAt, endsAt, rules);
   if (ruleError) return error(ruleError, 409);
   if (lisbonInstant(startsAt).getTime() < Date.now() + rules.minNoticeHours * 3600000) return error(`Esta sessão requer pelo menos ${rules.minNoticeHours}h de antecedência.`, 409);
@@ -1093,6 +1094,7 @@ function bookingBlockedByRules(startsAt, endsAt, rules) {
   const nextDate = new Date(`${date}T00:00:00Z`); nextDate.setUTCDate(nextDate.getUTCDate() + 1);
   const midnightNextDay = nextDate.toISOString().slice(0, 10);
   const endsAtMidnight = rules.fullDay && endsAt.slice(0, 10) === midnightNextDay && endTime === '00:00';
+  if (rules.sundaysBlocked && new Date(`${date}T12:00:00Z`).getUTCDay() === 0) return 'As sessões acompanhadas não estão disponíveis ao domingo.';
   if (!rules.fullDay && (endsAt.slice(0, 10) !== date || startTime < rules.startsAt || endTime > rules.endsAt)) return 'Esse horário está fora do período disponível para esta sessão.';
   if (rules.fullDay && (endsAt.slice(0, 10) !== date && !endsAtMidnight)) return 'Esse horário está fora do período disponível para esta sessão.';
   if (rules.lunchEnabled && startTime < rules.lunchEndsAt && endTime > rules.lunchStartsAt) return 'Esse horário inclui a pausa de almoço.';

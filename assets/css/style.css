@@ -163,6 +163,10 @@ button.admin-dashboard-card:hover { border-color: #16c7f3; }
 .schedule-settings-head { align-items: center; display: flex; gap: 18px; justify-content: space-between; margin-bottom: 16px; }
 .schedule-settings-head h3 { font-size: 1.1rem; margin: 4px 0 0; }
 .schedule-settings-head .eyebrow { margin: 0; }
+.schedule-weekday-toggle { align-items: center; border-top: 1px solid rgba(255,255,255,.1); color: rgba(255,255,255,.8); cursor: pointer; display: grid; gap: 3px 9px; grid-template-columns: auto 1fr; padding: 13px 0; }
+.schedule-weekday-toggle input { accent-color: #16c7f3; grid-row: 1 / 3; }
+.schedule-weekday-toggle strong { color: #fff; font-size: .82rem; }
+.schedule-weekday-toggle small { color: rgba(255,255,255,.5); font-size: .7rem; line-height: 1.4; }
 .schedule-rule { align-items: end; border-top: 1px solid rgba(255,255,255,.1); display: grid; gap: 10px; grid-template-columns: minmax(180px, 1.6fr) repeat(6, minmax(80px, 1fr)); padding: 13px 0; }
 .schedule-lunch-toggle { align-items: center; grid-template-columns: auto 1fr; padding-bottom: 8px; white-space: nowrap; }
 .schedule-rule strong { font-size: .83rem; line-height: 1.3; }

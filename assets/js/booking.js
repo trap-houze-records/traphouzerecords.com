@@ -6,7 +6,7 @@
   const rescheduleId = query.get('reschedule') || '';
   const requestedServiceId = query.get('service') || '';
   const fallbackServices = [{ id: 'studio-engineer', title: 'Sessão de Estúdio (Captação com engenheiro)', pricePerHour: 20, active: true }, { id: 'studio-art-direction', title: 'Sessão de Estúdio (Captação com engenheiro + Direção Artística)', pricePerHour: 30, active: true }, { id: 'studio-rental', title: 'Alugar o Estúdio', pricePerHour: 10, active: true }];
-  const rulesDefault = { startsAt: '10:00', endsAt: '22:00', lunchStartsAt: '13:00', lunchEndsAt: '14:00', lunchEnabled: true, minNoticeHours: 24 };
+  const rulesDefault = { startsAt: '10:00', endsAt: '22:00', lunchStartsAt: '13:00', lunchEndsAt: '14:00', lunchEnabled: true, minNoticeHours: 24, sundaysBlocked: false };
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const latestDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
   let month = new Date(today.getFullYear(), today.getMonth(), 1), selectedDate = null, rangeStart = '', rangeEnd = '', selectedSlots = [], busy = [], loading = true, errorMessage = '', client = null, reschedule = null, services = fallbackServices, selectedServiceId = fallbackServices.some(item => item.id === requestedServiceId) ? requestedServiceId : fallbackServices[0].id, rules = rulesDefault;
@@ -24,7 +24,7 @@
   const isBusy = (start, end) => busy.some(item => new Date(`${String(item.startsAt).replace(' ', 'T')}Z`) < end && new Date(`${String(item.endsAt).replace(' ', 'T')}Z`) > start);
   const availabilityEnd = () => rules.fullDay ? 24 * 60 : minute(rules.endsAt);
   const isAvailable = (date, start) => {
-    if (!date || !start || minute(start) < minute(rules.startsAt) || minute(start) + 30 > availabilityEnd()) return false;
+    if (!date || !start || (rules.sundaysBlocked && date.getDay() === 0) || minute(start) < minute(rules.startsAt) || minute(start) + 30 > availabilityEnd()) return false;
     const slotStart = dateTime(date, start), slotEnd = new Date(slotStart.getTime() + 30 * 60000), lunchStart = dateTime(date, rules.lunchStartsAt), lunchEnd = dateTime(date, rules.lunchEndsAt);
     return slotStart.getTime() >= Date.now() + Number(rules.minNoticeHours || 0) * 3600000 && !isBusy(slotStart, slotEnd) && (!rules.lunchEnabled || !(slotStart < lunchEnd && slotEnd > lunchStart));
   };
