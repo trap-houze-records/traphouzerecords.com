@@ -27,6 +27,6 @@ As novas reservas são espelhadas no calendário Booking e aparecem na Agenda do
 ## Separação entre sessões e aluguer
 
 - As reservas registadas no site ocupam o estúdio e bloqueiam todos os serviços no mesmo horário.
-- Os eventos externos criados diretamente no calendário Booking representam a disponibilidade do engenheiro e bloqueiam apenas as sessões acompanhadas. São considerados eventos com horário, de dia inteiro e com vários dias.
+- Os eventos externos criados diretamente no calendário Booking representam a disponibilidade do engenheiro e bloqueiam apenas as sessões acompanhadas. São considerados eventos com horário, de dia inteiro e com vários dias. Os eventos de dia inteiro bloqueiam mesmo que o Google os marque como “Disponível”.
 - O serviço **Alugar o Estúdio** ignora esses compromissos externos, porque não necessita de engenheiro.
 - Para impedir também o aluguer num período específico, crie uma reserva do estúdio ou um bloqueio específico na Agenda do Admin.

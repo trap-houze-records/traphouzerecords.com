@@ -919,7 +919,10 @@ async function googleBusyEvents(env, from, until) {
   const untilDay = String(until).slice(0, 10);
   const query = new URLSearchParams({ timeMin: lisbonInstant(`${fromDay} 00:00`).toISOString(), timeMax: lisbonInstant(`${untilDay} 00:00`).toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500' });
   const { payload } = await googleApi(env, `calendars/${encodeURIComponent(connection.calendarId)}/events?${query}`);
-  return (payload.items || []).filter(item => item.status !== 'cancelled' && item.transparency !== 'transparent').map(item => {
+  return (payload.items || []).filter(item => {
+    const allDay = Boolean(item.start?.date && item.end?.date);
+    return item.status !== 'cancelled' && (allDay || item.transparency !== 'transparent');
+  }).map(item => {
     const allDay = Boolean(item.start?.date && item.end?.date);
     const startsAt = allDay ? `${item.start.date} 00:00` : googleDateTime(item.start?.dateTime);
     const endsAt = allDay ? `${item.end.date} 00:00` : googleDateTime(item.end?.dateTime);
