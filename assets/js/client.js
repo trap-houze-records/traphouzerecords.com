@@ -13,6 +13,7 @@ const defaultClientData = {
 let clientData = defaultClientData;
 let musicTab = 'mix-master';
 let submittingTrack = null;
+let siteWhatsApp = '';
 const trackAudioUrls = new Map();
 const openTrackComments = new Set();
 // Ocultação provisória na Zona do Artista. Os dados e a gestão no Admin mantêm-se intactos.
@@ -30,6 +31,7 @@ if (apiToken) {
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const stages = [['start', 'Gravação'], ['mix', 'Mix'], ['master', 'Master']];
 const money = value => `${Number(value || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const whatsappHref = () => { const phone = String(siteWhatsApp || '').replace(/\D/g, ''); return phone ? `https://wa.me/${phone}` : ''; };
 const profileImage = value => /^(?:\/?images\/[-a-zA-Z0-9_./]+|https:\/\/[^\s]+)$/i.test(String(value || '')) ? String(value) : '/images/Logo.png';
 const paymentFields = item => {
   const amount = item.amountCents === undefined ? Number(item.amount || 0) : Number(item.amountCents || 0) / 100;
@@ -194,7 +196,7 @@ portal.innerHTML = `<div class="client-shell client-simple">
   <section class="track-section"><div class="booking-section-heading"><div><p class="eyebrow">Música</p><h2>As tuas faixas</h2></div>${musicTab === 'mix-master' ? '<button type="button" class="client-book-session" data-open-track-submit>+ Mix & Master</button>' : ''}</div><div class="track-tabs" role="tablist"><button type="button" class="${musicTab === 'mix-master' ? 'active' : ''}" data-music-tab="mix-master">Mix & Master <span>${clientData.tracks.filter(track => (track.category || 'mix-master') === 'mix-master').length}</span></button><button type="button" class="${musicTab === 'recording' ? 'active' : ''}" data-music-tab="recording">Gravações <span>${recordings.length}</span></button></div>${submitPanel}<div class="track-list">${musicTracks.map(renderTrack).join('') || `<p class="client-empty">${musicTab === 'recording' ? 'Ainda não tens gravações guardadas.' : 'Ainda não tens músicas em Mix & Master.'}</p>`}</div></section>
   <section class="booking-section booking-section-history"><div class="booking-section-heading"><div><p class="eyebrow">Histórico</p><h2>Reservas anteriores</h2></div><span>${bookings.history.length} concluídas</span></div><div class="booking-list">${bookings.history.map(renderBooking).join('') || '<p class="client-empty">Ainda não existem reservas anteriores.</p>'}</div></section>
   ${renderArtistProfile(clientData.artistProfile)}
-  <aside class="client-simple-help"><span>Precisas de ajuda?</span><a href="https://wa.me/351910734914" target="_blank" rel="noopener">Abrir WhatsApp <b>→</b></a></aside>
+  ${whatsappHref() ? `<aside class="client-simple-help"><span>Precisas de ajuda?</span><a href="${escapeHtml(whatsappHref())}" target="_blank" rel="noopener">Abrir WhatsApp <b>→</b></a></aside>` : ''}
   <p class="client-demo">${portalNote}</p>
   ${outstanding ? `<div class="client-total-due client-total-due-footer"><span>Total em falta</span><strong>${money(outstanding)}</strong></div>` : ''}
 </div>`;
@@ -333,7 +335,7 @@ function hydrateTrackPlayers() {
 }
 
 function renderLogin(message = '') {
-  portal.innerHTML = `<main class="client-login-shell"><section class="client-login-card"><a class="client-brand" href="/" aria-label="Trap Houze Records"><img src="/images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div><p class="eyebrow">Acesso privado</p><h1>O teu trabalho, num só lugar.</h1><p>Entra com o teu nome e a palavra-passe enviada pela Trap Houze Records.</p></div><form id="clientLoginForm" class="client-login-form"><label>Nome do cliente<input name="username" autocomplete="username" required></label><label>Palavra-passe<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">Entrar <span>→</span></button><p id="clientLoginMessage" role="alert">${escapeHtml(message)}</p></form><p class="client-login-help">Ainda não tens acesso? <a href="https://wa.me/351910734914" target="_blank" rel="noopener">Fala connosco</a></p></section></main>`;
+  portal.innerHTML = `<main class="client-login-shell"><section class="client-login-card"><a class="client-brand" href="/" aria-label="Trap Houze Records"><img src="/images/Logo.png" alt="Trap Houze Records"><span>Área do cliente</span></a><div><p class="eyebrow">Acesso privado</p><h1>O teu trabalho, num só lugar.</h1><p>Entra com o teu nome e a palavra-passe enviada pela Trap Houze Records.</p></div><form id="clientLoginForm" class="client-login-form"><label>Nome do cliente<input name="username" autocomplete="username" required></label><label>Palavra-passe<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">Entrar <span>→</span></button><p id="clientLoginMessage" role="alert">${escapeHtml(message)}</p></form>${whatsappHref() ? `<p class="client-login-help">Ainda não tens acesso? <a href="${escapeHtml(whatsappHref())}" target="_blank" rel="noopener">Fala connosco</a></p>` : ''}</section></main>`;
   document.getElementById('clientLoginForm').addEventListener('submit', event => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -530,13 +532,28 @@ function loadClients() {
   } catch { /* Usa os dados de demonstração. */ }
   return [{ name: defaultClientData.client, username: 'dinis', password: 'demo', tracks: defaultClientData.tracks, bookings: defaultClientData.bookings }];
 }
-const savedUsername = sessionStorage.getItem('th_client_demo');
-const savedClient = loadClients().find(item => item.username.toLowerCase() === savedUsername);
-const previewUsername = new URLSearchParams(location.search).get('preview')?.toLowerCase();
-const previewClient = location.protocol === 'file:' && previewUsername ? loadClients().find(item => item.username.toLowerCase() === previewUsername) : null;
-if (apiBase && apiToken) {
-  apiRequest('/client/portal').then(result => { clientData = normalisePortal(result); renderPortal(); }).catch(() => { apiToken = ''; localStorage.removeItem(clientTokenKey); sessionStorage.removeItem(clientTokenKey); renderLogin(); });
-} else if (apiBase) renderLogin();
-else if (previewClient) { clientData = previewClient; renderPortal(); }
-else if (savedClient?.active !== false) { clientData = savedClient; renderPortal(); }
-else { sessionStorage.removeItem('th_client_demo'); renderLogin(savedClient ? 'Esta conta está temporariamente sem acesso.' : ''); }
+function startPortal() {
+  const savedUsername = sessionStorage.getItem('th_client_demo');
+  const savedClient = loadClients().find(item => item.username.toLowerCase() === savedUsername);
+  const previewUsername = new URLSearchParams(location.search).get('preview')?.toLowerCase();
+  const previewClient = location.protocol === 'file:' && previewUsername ? loadClients().find(item => item.username.toLowerCase() === previewUsername) : null;
+  if (apiBase && apiToken) {
+    apiRequest('/client/portal').then(result => { clientData = normalisePortal(result); renderPortal(); }).catch(() => { apiToken = ''; localStorage.removeItem(clientTokenKey); sessionStorage.removeItem(clientTokenKey); renderLogin(); });
+  } else if (apiBase) renderLogin();
+  else if (previewClient) { clientData = previewClient; renderPortal(); }
+  else if (savedClient?.active !== false) { clientData = savedClient; renderPortal(); }
+  else { sessionStorage.removeItem('th_client_demo'); renderLogin(savedClient ? 'Esta conta está temporariamente sem acesso.' : ''); }
+}
+async function loadSiteContact() {
+  const urls = apiBase ? [`${apiBase}/content`, '/data/site.json'] : ['/data/site.json'];
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) continue;
+      const content = await response.json();
+      siteWhatsApp = String(content?.site?.whatsapp || '').replace(/\D/g, '');
+      if (siteWhatsApp) return;
+    } catch { /* Tenta a fonte seguinte. */ }
+  }
+}
+loadSiteContact().finally(startPortal);
