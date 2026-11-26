@@ -2,6 +2,7 @@ let content;
 let activeSlide = 0;
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
+const whatsappNumber = value => String(value || '').replace(/\D/g, '');
 const safeUrl = value => {
   const raw = String(value || '').trim();
   if (/^(?:\.\/)?images\/[a-zA-Z0-9_./-]+$/.test(raw)) return raw.replace(/^\.\//, '');
@@ -67,7 +68,7 @@ function renderHelpPopup() {
   const email = String(site.email || '').trim();
   const instagram = safeUrl(site.instagram);
   const instagramLabel = String(site.instagramHandle || '').trim() || 'Instagram';
-  const whatsapp = String(site.whatsapp || '').replace(/\D/g, '');
+  const whatsapp = whatsappNumber(site.whatsapp);
   return `<button class="help-button" aria-label="${escapeHtml(title)}">?</button><div id="helpPopup" class="help-popup"><div class="help-popup-header"><h4>${escapeHtml(title)}</h4><button class="close-help" aria-label="Fechar">×</button></div><div class="help-content">${site.helpText ? `<p class="help-intro">${escapeHtml(site.helpText)}</p>` : ''}<div class="help-links">${email ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : ''}${instagram ? `<a href="${escapeHtml(instagram)}" target="_blank" rel="noopener">${escapeHtml(instagramLabel)}</a>` : ''}${whatsapp ? `<a href="https://wa.me/${escapeHtml(whatsapp)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}</div>${site.hours ? `<p class="help-hours">${escapeHtml(site.hours)}</p>` : ''}</div></div>`;
 }
 function renderSite() {
@@ -94,7 +95,14 @@ function showEquipment(index) {
 }
 function openBooking(service) {
   if (service.action === 'whatsapp') {
-    window.open(`https://wa.me/${content.site.whatsapp}?text=${encodeURIComponent(`Olá Trap Houze! Quero marcar ${service.title}.`)}`, '_blank', 'noopener');
+    const phone = whatsappNumber(content.site.whatsapp);
+    if (!phone) {
+      document.getElementById('helpPopup')?.classList.add('active');
+      return;
+    }
+    const url = new URL(`https://wa.me/${phone}`);
+    url.searchParams.set('text', `Olá Trap Houze! Quero marcar ${service.title}.`);
+    window.open(url.href, '_blank', 'noopener');
     return;
   }
   const requestedService = String(service.bookingServiceId || '').trim();
