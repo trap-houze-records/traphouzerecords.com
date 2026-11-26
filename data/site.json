@@ -63,8 +63,8 @@
   ],
   "services": [
     {
-      "title": "Agendamento",
-      "description": "Reserve o seu horário no nosso estúdio profissional.",
+      "title": "Agenda",
+      "description": "Reserve o teu horário no nosso estúdio",
       "icon": "📅",
       "action": "booking",
       "visible": true
